@@ -13,7 +13,6 @@ typedef struct CPUArchState {
 
 struct ArchCPU {
     CPUState parent_obj;
-
     CPUCdM16State env;
 };
 
