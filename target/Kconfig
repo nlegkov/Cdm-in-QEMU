@@ -18,5 +18,7 @@ source tricore/Kconfig
 source xtensa/Kconfig
 source hexagon/Kconfig
 
+source cdm16/Kconfig
+
 config TARGET_BIG_ENDIAN
     bool

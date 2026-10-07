@@ -1,0 +1,2 @@
+config CDM16
+    bool
