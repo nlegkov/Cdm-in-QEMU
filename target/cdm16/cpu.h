@@ -37,6 +37,7 @@ struct ArchCPU {
 struct CDM16CPUClass {
     CPUClass parent_class;
 
+    DeviceRealize parent_realize; 
     ResettablePhases parent_phases; // при сбросе процессора вызывается родительские функции сброса
 };
 
