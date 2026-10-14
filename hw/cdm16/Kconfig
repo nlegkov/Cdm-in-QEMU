@@ -1,0 +1,4 @@
+config CDM16_MACHINE
+    bool
+    default y
+    depends on CDM16

@@ -19,13 +19,13 @@
 
 #define CDM16_FP_REG 7
 
+// 32 так как для QEMU лучше 32
 typedef struct CPUArchState {
-    uint16_t regs[CDM16_NUM_REGS]; // 8 Общих регитров 0-6 + 1 регистр FP
+    uint32_t regs[CDM16_NUM_REGS];
 
-    uint16_t sp; // указатель стека
-    uint16_t pc; // счетчик команд
-    uint16_t ps; // регистр состояния процессора
-
+    uint32_t sp;
+    uint32_t pc;
+    uint32_t ps;
 } CPUCdM16State;
 
 
@@ -37,9 +37,17 @@ struct ArchCPU {
 struct CDM16CPUClass {
     CPUClass parent_class;
 
-    DeviceRealize parent_realize; 
+    DeviceRealize parent_realize; // родительская функция realize, которая вызывается после того, как CdM-16 CPU уже создан и QEMU переводит его в рабочее состояние
     ResettablePhases parent_phases; // при сбросе процессора вызывается родительские функции сброса
 };
+
+void cdm16_translate_init(void);
+
+void cdm16_translate_code(CPUState *cs,
+                          TranslationBlock *tb,
+                          int *max_insns,
+                          vaddr pc,
+                          void *host_pc);
 
 #define CPU_RESOLVING_TYPE TYPE_CDM16_CPU
 

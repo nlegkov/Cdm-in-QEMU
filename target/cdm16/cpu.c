@@ -2,6 +2,13 @@
 #include "cpu.h"
 #include "qapi/error.h"
 #include "qemu/qemu-print.h"
+#include "accel/tcg/cpu-ops.h"
+
+#include "accel/tcg/cpu-ops.h"
+#include "exec/cputlb.h"
+#include "exec/page-protection.h"
+#include "exec/target_page.h"
+#include "hw/core/sysemu-cpu-ops.h"
 
 // записать новое значение PC в процессор CdM-16.
 static void cdm16_cpu_set_pc(CPUState *cs, vaddr value)
@@ -10,7 +17,7 @@ static void cdm16_cpu_set_pc(CPUState *cs, vaddr value)
     CDM16CPU *cpu = CDM16_CPU(cs);
 
     // записываем новое значение в регистр pc процессора CdM-16
-    cpu->env.pc = (uint16_t)value;
+    cpu->env.pc = value & 0xffff;
 }
 
 // получить текущее значение PC процессора CdM-16.
@@ -20,7 +27,7 @@ static vaddr cdm16_cpu_get_pc(CPUState *cs)
     CDM16CPU *cpu = CDM16_CPU(cs);
 
     // возвращаем текущее значение регистра pc процессора CdM-16
-    return cpu->env.pc;
+    return cpu->env.pc & 0xffff;
 }
 
 // состояние CdM-16 после reset.
@@ -90,6 +97,101 @@ static void cdm16_cpu_dump_state(CPUState *cs, FILE *f, int flags)
                  (unsigned)env->regs[7]);
 }
 
+// Возвращает состояние процессора CdM-16 для TCG.
+static TCGTBCPUState cdm16_get_tb_cpu_state(CPUState *cs)
+{
+    CPUCdM16State *env = cpu_env(cs);
+
+    return (TCGTBCPUState) {
+        .pc = env->pc & 0xffff,
+        .flags = 0,
+    };
+}
+
+// CdM-16 CPU не поддерживает MMU, поэтому всегда возвращаем 0.
+static int cdm16_cpu_mmu_index(CPUState *cs, bool ifetch)
+{
+    (void)cs;
+    (void)ifetch;
+    return 0;
+}
+
+// Пока без поддержки прерываний, поэтому всегда возвращаем false.
+static bool cdm16_cpu_has_work(CPUState *cs)
+{
+    (void)cs;
+
+    return false;
+}
+
+// Отвечает за обработку прерываний.
+static bool cdm16_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
+{
+    (void)cs;
+    (void)interrupt_request;
+
+    return false;
+}
+
+// Обрабатывает изменения указателей в адресном пространстве CdM-16, ограничивая их значением 16-бит.
+static vaddr cdm16_cpu_pointer_wrap(CPUState *cs, int mmu_idx,
+                                    vaddr result, vaddr base)
+{
+    (void)cs;
+    (void)mmu_idx;
+    (void)base;
+
+    return (uint16_t)result & 0xffff;
+}
+
+// Обрабатывает заполнение TLB для CdM-16 CPU, ограничивая адреса значением 16-бит.
+static bool cdm16_cpu_tlb_fill(CPUState *cs, vaddr addr, int size,
+                               MMUAccessType access_type, int mmu_idx,
+                               bool probe, uintptr_t retaddr)
+{
+    vaddr address;
+
+    (void)size;
+    (void)access_type;
+    (void)probe;
+    (void)retaddr;
+
+    address = (addr & 0xffff) & TARGET_PAGE_MASK;
+
+    tlb_set_page(cs,
+                 address,
+                 address,
+                 PAGE_READ | PAGE_WRITE | PAGE_EXEC,
+                 mmu_idx,
+                 TARGET_PAGE_SIZE);
+
+    return true;
+}
+
+// CPUClass -> sysemu_ops -> cdm16_sysemu_ops -> cdm16_cpu_has_work
+static const SysemuCPUOps cdm16_sysemu_ops = {
+    .has_work = cdm16_cpu_has_work,
+};
+
+
+// Все CdM-16 CPU используют один и тот же набор функций TCG.
+static const TCGCPUOps cdm16_tcg_ops = {
+    .guest_default_memory_order = TCG_MO_ALL,
+    .mttcg_supported = false,
+
+    .initialize = cdm16_translate_init,
+    .translate_code = cdm16_translate_code,
+    .get_tb_cpu_state = cdm16_get_tb_cpu_state,
+
+    .mmu_index = cdm16_cpu_mmu_index,
+    .tlb_fill = cdm16_cpu_tlb_fill,
+    .pointer_wrap = cdm16_cpu_pointer_wrap,
+
+    .cpu_exec_interrupt = cdm16_cpu_exec_interrupt,
+    .cpu_exec_halt = cdm16_cpu_has_work,
+    .cpu_exec_reset = cpu_reset,
+};
+
 // все CdM-16 CPU работают вот так
 static void cdm16_cpu_class_init(ObjectClass *klass, const void *data)
 {
@@ -101,7 +203,7 @@ static void cdm16_cpu_class_init(ObjectClass *klass, const void *data)
     device_class_set_parent_realize(
         dc,
         cdm16_cpu_realize,
-        &ccc->parent_realize
+        &ccc->parent_realizeсв и
     );
 
     resettable_class_set_parent_phases(
@@ -115,6 +217,9 @@ static void cdm16_cpu_class_init(ObjectClass *klass, const void *data)
     cc->set_pc = cdm16_cpu_set_pc;
     cc->get_pc = cdm16_cpu_get_pc;
     cc->dump_state = cdm16_cpu_dump_state;
+
+    cc->sysemu_ops = &cdm16_sysemu_ops;
+    cc->tcg_ops = &cdm16_tcg_ops;
 }
 
 // Это описание нового типа для QOM.
