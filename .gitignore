@@ -1,6 +1,7 @@
 /GNUmakefile
 /build/
 /build-cdm16/
+/build-cdm16-new/
 /build-test/
 /.cache/
 /.vscode/

@@ -8,6 +8,11 @@
 #endif
 
 
+#define CDM16_EXCP_UNALIGNED_SP   1
+#define CDM16_EXCP_UNALIGNED_PC   2
+#define CDM16_EXCP_INVALID_INSN   3
+#define CDM16_EXCP_DOUBLE_FAULT   4
+
 
 #define CDM16_NUM_REGS 8
 

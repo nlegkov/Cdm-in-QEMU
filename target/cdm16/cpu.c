@@ -10,6 +10,39 @@
 #include "exec/target_page.h"
 #include "hw/core/sysemu-cpu-ops.h"
 
+#include "accel/tcg/cpu-ldst.h"
+
+#include "system/address-spaces.h"
+#include "system/memory.h"
+
+// Обрабатывает исключения, которые произошли во время исполнения кода.
+static void cdm16_cpu_do_interrupt(CPUState *cs)
+{
+    CPUCdM16State *env = cpu_env(cs);
+
+    uint32_t exception = cs->exception_index;
+
+    /* Адрес записи в таблице векторов */
+    uint32_t vector_addr = exception * 4;
+
+    uint32_t old_pc = env->pc & 0xffff;
+    uint32_t old_ps = env->ps & 0xffff;
+
+    /* Сохраняем PS в стек */
+    env->sp = (env->sp - 2) & 0xffff;
+    cpu_stw_le_data(env, env->sp, old_ps);
+
+    /* Сохраняем PC в стек */
+    env->sp = (env->sp - 2) & 0xffff;
+    cpu_stw_le_data(env, env->sp, old_pc);
+
+    /* Загружаем адрес обработчика */
+    env->pc = cpu_lduw_le_data(env, vector_addr);
+
+    /* Загружаем новый PS */
+    env->ps = cpu_lduw_le_data(env, vector_addr + 2);
+}
+
 // записать новое значение PC в процессор CdM-16.
 static void cdm16_cpu_set_pc(CPUState *cs, vaddr value)
 {
@@ -42,6 +75,33 @@ static void cdm16_cpu_reset_hold(Object *obj, ResetType type)
     }
 
     memset(env, 0, sizeof(*env));
+
+
+    uint8_t vector[4];
+
+    MemTxResult result = address_space_read(
+        &address_space_memory,
+        0x0000,
+        MEMTXATTRS_UNSPECIFIED,
+        vector,
+        sizeof(vector)
+    );
+
+    if (result == MEMTX_OK) {
+        env->pc = (uint32_t)vector[0]
+                | ((uint32_t)vector[1] << 8);
+
+        env->ps = (uint32_t)vector[2]
+                | ((uint32_t)vector[3] << 8);
+    }
+
+    /*fprintf(stderr,
+        "RESET: result=%d vector=%02x %02x %02x %02x "
+        "PC=0x%04x SP=0x%04x PS=0x%04x\n",
+        result,
+        vector[0], vector[1], vector[2], vector[3],
+        env->pc, env->sp, env->ps
+    );*/
 }
 
 // Отвечает за момент, когда объект CPU уже создан и QEMU переводит его в рабочее состояние.
@@ -187,6 +247,8 @@ static const TCGCPUOps cdm16_tcg_ops = {
     .tlb_fill = cdm16_cpu_tlb_fill,
     .pointer_wrap = cdm16_cpu_pointer_wrap,
 
+    .do_interrupt = cdm16_cpu_do_interrupt,
+
     .cpu_exec_interrupt = cdm16_cpu_exec_interrupt,
     .cpu_exec_halt = cdm16_cpu_has_work,
     .cpu_exec_reset = cpu_reset,
@@ -203,7 +265,7 @@ static void cdm16_cpu_class_init(ObjectClass *klass, const void *data)
     device_class_set_parent_realize(
         dc,
         cdm16_cpu_realize,
-        &ccc->parent_realizeсв и
+        &ccc->parent_realize
     );
 
     resettable_class_set_parent_phases(
