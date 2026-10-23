@@ -3,6 +3,13 @@
 #include "tcg/tcg-op.h"
 #include "exec/translator.h"
 #include "exec/translation-block.h"
+#include "decode.h"
+#include "exec/helper-proto.h"
+#include "exec/helper-gen.h"
+#include "translate.h"
+#define HELPER_H "helper.h"
+#include "exec/helper-info.c.inc"
+#undef HELPER_H
 
 typedef struct DisasContext {
     DisasContextBase base;
@@ -12,6 +19,24 @@ static TCGv_i32 cpu_regs[CDM16_NUM_REGS];
 static TCGv_i32 cpu_sp;
 static TCGv_i32 cpu_pc;
 static TCGv_i32 cpu_ps;
+
+TCGv_i32 cdm16_tcg_reg(unsigned reg)
+{
+    g_assert(reg < CDM16_NUM_REGS);
+    return cpu_regs[reg];
+}
+TCGv_i32 cdm16_tcg_sp(void)
+{
+    return cpu_sp;
+}
+TCGv_i32 cdm16_tcg_pc(void)
+{
+    return cpu_pc;
+}
+TCGv_i32 cdm16_tcg_ps(void)
+{
+    return cpu_ps;
+}
 
 // инициализация представлнения регистров процессора CdM-16 в TCG.
 void cdm16_translate_init(void)
@@ -67,21 +92,58 @@ static void cdm16_tr_tb_start(DisasContextBase *db, CPUState *cs)
 static void cdm16_tr_insn_start(DisasContextBase *db, CPUState *cs)
 {
     tcg_gen_insn_start(db->pc_next, 0, 0);
+    
 }
 
-
-// временная тестовая инструкция
+// Перевод гостевой инструкции
 static void cdm16_tr_translate_insn(DisasContextBase *db, CPUState *cs)
 {
-    db->pc_next = (db->pc_next + 2) & 0xffff;
-    db->is_jmp = DISAS_TOO_MANY;
+    CPUCdM16State *env = cpu_env(cs);
+
+    uint16_t insn = translator_lduw_end(
+        env, db, db->pc_next, MO_LE
+    );
+
+    int size = cdm16_decode_instruction(env, db, insn);
+
+    if (size == 0) {
+        cdm16_gen_exception(
+            CDM16_EXCP_INVALID_INSN,
+            db->pc_next
+        );
+
+        db->pc_next = (db->pc_next + 2) & 0xffff;
+        db->is_jmp = DISAS_NORETURN;
+        return;
+    }
+
+    db->pc_next = (db->pc_next + size) & 0xffff;
+
+    if (db->is_jmp == DISAS_NEXT) {
+        db->is_jmp = DISAS_TOO_MANY;
+    }
 }
 
 // завершение Translation Block
-static void cdm16_tr_tb_stop(DisasContextBase *db, CPUState *cs)
+static void cdm16_tr_tb_stop(DisasContextBase *db,
+                             CPUState *cs)
 {
-    tcg_gen_movi_i32(cpu_pc, db->pc_next & 0xffff);
-    tcg_gen_exit_tb(NULL, 0);
+    switch (db->is_jmp) {
+    case DISAS_TOO_MANY:
+        tcg_gen_movi_i32(
+            cpu_pc,
+            db->pc_next & 0xffff
+        );
+        tcg_gen_exit_tb(NULL, 0);
+        break;
+
+    case DISAS_NORETURN:
+        /* HALT уже завершает исполнение через helper */
+        break;
+
+    default:
+        g_assert_not_reached();
+    }
 }
 
 // CdM-16 CPU использует один и тот же набор функций TranslatorOps.
@@ -111,4 +173,24 @@ void cdm16_translate_code(CPUState *cs,
                     &cdm16_tr_ops,
                     &dc.base,
                     TCG_TYPE_VA);
+}
+
+void cdm16_gen_exception(unsigned exception, uint32_t pc)
+{
+    /* Адрес инструкции, вызвавшей исключение */
+    tcg_gen_movi_i32(cpu_pc, pc & 0xffff);
+
+    /* Вызов функции во время исполнения гостевого кода */
+    gen_helper_cdm16_raise_exception(
+        tcg_env,
+        tcg_constant_i32(exception)
+    );
+}
+
+
+
+void cdm16_gen_halt(uint16_t next_pc)
+{
+    tcg_gen_movi_i32(cpu_pc, next_pc);
+    gen_helper_halt(tcg_env);
 }

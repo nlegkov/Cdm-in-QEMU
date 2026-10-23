@@ -5,16 +5,28 @@
 #include "system/address-spaces.h"
 #include "qom/object.h"
 #include "cpu.h"
+#include "system/reset.h"
+#include "hw/core/cpu.h"
+#include "system/reset.h"
 
 #define TYPE_CDM16_MACHINE MACHINE_TYPE_NAME("cdm16")
 
 OBJECT_DECLARE_SIMPLE_TYPE(CDM16MachineState, CDM16_MACHINE)
+
 
 struct CDM16MachineState {
     MachineState parent_obj;
 
     CDM16CPU cpu;
 };
+
+static void cdm16_machine_reset(MachineState *machine, ResetType type)
+{
+    CDM16MachineState *s = CDM16_MACHINE(machine);
+
+    qemu_devices_reset(type);
+    cpu_reset(CPU(&s->cpu));
+}
 
 // создаёт конкретный экземпляр машины.
 static void cdm16_machine_init(MachineState *machine)
@@ -39,7 +51,6 @@ static void cdm16_machine_init(MachineState *machine)
 
     /*
      * Переводим созданный CPU в рабочее состояние.
-     * Здесь будет вызван cdm16_cpu_realize().
      */
     qdev_realize(DEVICE(&s->cpu), NULL, &error_fatal);
 }
@@ -61,6 +72,8 @@ static void cdm16_machine_class_init(ObjectClass *klass, const void *data)
 
     mc->default_ram_size = 64 * KiB;
     mc->default_ram_id = "cdm16.ram";
+    
+    mc->reset = cdm16_machine_reset;
 }
 
 static const TypeInfo cdm16_machine_type_info = {
