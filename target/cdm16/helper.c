@@ -32,3 +32,18 @@ void helper_cdm16_raise_exception(CPUCdM16State *env,
 
     cpu_loop_exit(cs);
 }
+
+void HELPER(cdm16_debug_addsp)(
+    uint32_t old_sp,
+    uint32_t reg,
+    uint32_t new_sp)
+{
+    fprintf(stderr,
+        "ADDSP: SP=0x%04x REG=0x%04x "
+        "NEW_SP=0x%04x ODD=%u\n",
+        old_sp & 0xffff,
+        reg & 0xffff,
+        new_sp & 0xffff,
+        new_sp & 1
+    );
+}

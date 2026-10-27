@@ -1,8 +1,8 @@
-#include "qemu/osdep.h"
 #include "cpu.h"
-#include "qapi/error.h"
-#include "qemu/qemu-print.h"
 #include "accel/tcg/cpu-ops.h"
+#include "qapi/error.h"
+#include "qemu/osdep.h"
+#include "qemu/qemu-print.h"
 
 #include "accel/tcg/cpu-ops.h"
 #include "exec/cputlb.h"
@@ -15,9 +15,18 @@
 #include "system/address-spaces.h"
 #include "system/memory.h"
 
-// Обрабатывает исключения, которые произошли во время исполнения кода.
-static void cdm16_cpu_do_interrupt(CPUState *cs)
-{
+static bool cdm16_enter_exception(CPUState *cs, unsigned exception) {
+    CPUCdM16State *env = cpu_env(cs);
+
+    /*
+     * Проверяем, можно ли корректно
+     * выполнить вход в обработчик.
+     */
+
+    if (env->sp & 1) {
+        return false;
+    }
+
     CPUCdM16State *env = cpu_env(cs);
 
     uint32_t exception = cs->exception_index;
@@ -41,11 +50,38 @@ static void cdm16_cpu_do_interrupt(CPUState *cs)
 
     /* Загружаем новый PS */
     env->ps = cpu_lduw_le_data(env, vector_addr + 2);
+
+    return true;
+}
+
+// Обрабатывает исключения, которые произошли во время исполнения кода.
+static void cdm16_cpu_do_interrupt(CPUState *cs) {
+    int exception = cs->exception_index;
+
+    cs->exception_index = -1;
+
+    /* Пытаемся обработать исходное исключение */
+    if (cdm16_enter_exception(cs, exception)) {
+        return;
+    }
+
+    /* Ошибка при входе в обычный обработчик */
+    if (exception != CDM16_EXCP_DOUBLE_FAULT) {
+        fprintf(stderr, "CDM16: DOUBLE_FAULT after exception %d\n", exception);
+
+        if (cdm16_enter_exception(cs, CDM16_EXCP_DOUBLE_FAULT)) {
+            return;
+        }
+    }
+
+    /* Ошибка при входе в DOUBLE_FAULT */
+    fprintf(stderr, "CDM16: CRITICAL FAULT\n");
+
+    cs->halted = 1;
 }
 
 // записать новое значение PC в процессор CdM-16.
-static void cdm16_cpu_set_pc(CPUState *cs, vaddr value)
-{
+static void cdm16_cpu_set_pc(CPUState *cs, vaddr value) {
     // приведение абстрактного процессора к CDM16CPU
     CDM16CPU *cpu = CDM16_CPU(cs);
 
@@ -54,8 +90,7 @@ static void cdm16_cpu_set_pc(CPUState *cs, vaddr value)
 }
 
 // получить текущее значение PC процессора CdM-16.
-static vaddr cdm16_cpu_get_pc(CPUState *cs)
-{
+static vaddr cdm16_cpu_get_pc(CPUState *cs) {
     // приведение абстрактного процессора к CDM16CPU
     CDM16CPU *cpu = CDM16_CPU(cs);
 
@@ -64,8 +99,7 @@ static vaddr cdm16_cpu_get_pc(CPUState *cs)
 }
 
 // состояние CdM-16 после reset.
-static void cdm16_cpu_reset_hold(Object *obj, ResetType type)
-{
+static void cdm16_cpu_reset_hold(Object *obj, ResetType type) {
     CPUState *cs = CPU(obj);
     CDM16CPUClass *ccc = CDM16_CPU_GET_CLASS(obj);
     CPUCdM16State *env = cpu_env(cs);
@@ -76,23 +110,16 @@ static void cdm16_cpu_reset_hold(Object *obj, ResetType type)
 
     memset(env, 0, sizeof(*env));
 
-
     uint8_t vector[4];
 
-    MemTxResult result = address_space_read(
-        &address_space_memory,
-        0x0000,
-        MEMTXATTRS_UNSPECIFIED,
-        vector,
-        sizeof(vector)
-    );
+    MemTxResult result =
+        address_space_read(&address_space_memory, 0x0000,
+                           MEMTXATTRS_UNSPECIFIED, vector, sizeof(vector));
 
     if (result == MEMTX_OK) {
-        env->pc = (uint32_t)vector[0]
-                | ((uint32_t)vector[1] << 8);
+        env->pc = (uint32_t)vector[0] | ((uint32_t)vector[1] << 8);
 
-        env->ps = (uint32_t)vector[2]
-                | ((uint32_t)vector[3] << 8);
+        env->ps = (uint32_t)vector[2] | ((uint32_t)vector[3] << 8);
     }
 
     /*fprintf(stderr,
@@ -104,9 +131,9 @@ static void cdm16_cpu_reset_hold(Object *obj, ResetType type)
     );*/
 }
 
-// Отвечает за момент, когда объект CPU уже создан и QEMU переводит его в рабочее состояние.
-static void cdm16_cpu_realize(DeviceState *dev, Error **errp)
-{
+// Отвечает за момент, когда объект CPU уже создан и QEMU переводит его в
+// рабочее состояние.
+static void cdm16_cpu_realize(DeviceState *dev, Error **errp) {
     CPUState *cs = CPU(dev);
     CDM16CPUClass *ccc = CDM16_CPU_GET_CLASS(dev);
     Error *local_err = NULL;
@@ -124,8 +151,7 @@ static void cdm16_cpu_realize(DeviceState *dev, Error **errp)
 }
 
 // Вывод состояния процессора CdM-16 в файл f.
-static void cdm16_cpu_dump_state(CPUState *cs, FILE *f, int flags)
-{
+static void cdm16_cpu_dump_state(CPUState *cs, FILE *f, int flags) {
     CPUCdM16State *env = cpu_env(cs);
 
     (void)flags;
@@ -133,70 +159,56 @@ static void cdm16_cpu_dump_state(CPUState *cs, FILE *f, int flags)
     qemu_fprintf(f,
                  "PC=0x%04x SP=0x%04x PS=0x%04x "
                  "[I=%u C=%u V=%u Z=%u N=%u]\n",
-                 (unsigned)env->pc,
-                 (unsigned)env->sp,
-                 (unsigned)env->ps,
-                 (env->ps & CDM16_PSR_I) != 0,
-                 (env->ps & CDM16_PSR_C) != 0,
-                 (env->ps & CDM16_PSR_V) != 0,
-                 (env->ps & CDM16_PSR_Z) != 0,
+                 (unsigned)env->pc, (unsigned)env->sp, (unsigned)env->ps,
+                 (env->ps & CDM16_PSR_I) != 0, (env->ps & CDM16_PSR_C) != 0,
+                 (env->ps & CDM16_PSR_V) != 0, (env->ps & CDM16_PSR_Z) != 0,
                  (env->ps & CDM16_PSR_N) != 0);
 
-    qemu_fprintf(f,
-                 "r0=0x%04x r1=0x%04x r2=0x%04x r3=0x%04x\n",
-                 (unsigned)env->regs[0],
-                 (unsigned)env->regs[1],
-                 (unsigned)env->regs[2],
-                 (unsigned)env->regs[3]);
+    qemu_fprintf(f, "r0=0x%04x r1=0x%04x r2=0x%04x r3=0x%04x\n",
+                 (unsigned)env->regs[0], (unsigned)env->regs[1],
+                 (unsigned)env->regs[2], (unsigned)env->regs[3]);
 
-    qemu_fprintf(f,
-                 "r4=0x%04x r5=0x%04x r6=0x%04x r7(fp)=0x%04x\n",
-                 (unsigned)env->regs[4],
-                 (unsigned)env->regs[5],
-                 (unsigned)env->regs[6],
-                 (unsigned)env->regs[7]);
+    qemu_fprintf(f, "r4=0x%04x r5=0x%04x r6=0x%04x r7(fp)=0x%04x\n",
+                 (unsigned)env->regs[4], (unsigned)env->regs[5],
+                 (unsigned)env->regs[6], (unsigned)env->regs[7]);
 }
 
 // Возвращает состояние процессора CdM-16 для TCG.
-static TCGTBCPUState cdm16_get_tb_cpu_state(CPUState *cs)
-{
+static TCGTBCPUState cdm16_get_tb_cpu_state(CPUState *cs) {
     CPUCdM16State *env = cpu_env(cs);
 
-    return (TCGTBCPUState) {
+    return (TCGTBCPUState){
         .pc = env->pc & 0xffff,
         .flags = 0,
     };
 }
 
 // CdM-16 CPU не поддерживает MMU, поэтому всегда возвращаем 0.
-static int cdm16_cpu_mmu_index(CPUState *cs, bool ifetch)
-{
+static int cdm16_cpu_mmu_index(CPUState *cs, bool ifetch) {
     (void)cs;
     (void)ifetch;
     return 0;
 }
 
 // Пока без поддержки прерываний, поэтому всегда возвращаем false.
-static bool cdm16_cpu_has_work(CPUState *cs)
-{
+static bool cdm16_cpu_has_work(CPUState *cs) {
     (void)cs;
 
     return false;
 }
 
 // Отвечает за обработку прерываний.
-static bool cdm16_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
-{
+static bool cdm16_cpu_exec_interrupt(CPUState *cs, int interrupt_request) {
     (void)cs;
     (void)interrupt_request;
 
     return false;
 }
 
-// Обрабатывает изменения указателей в адресном пространстве CdM-16, ограничивая их значением 16-бит.
-static vaddr cdm16_cpu_pointer_wrap(CPUState *cs, int mmu_idx,
-                                    vaddr result, vaddr base)
-{
+// Обрабатывает изменения указателей в адресном пространстве CdM-16, ограничивая
+// их значением 16-бит.
+static vaddr cdm16_cpu_pointer_wrap(CPUState *cs, int mmu_idx, vaddr result,
+                                    vaddr base) {
     (void)cs;
     (void)mmu_idx;
     (void)base;
@@ -204,11 +216,11 @@ static vaddr cdm16_cpu_pointer_wrap(CPUState *cs, int mmu_idx,
     return (uint16_t)result & 0xffff;
 }
 
-// Обрабатывает заполнение TLB для CdM-16 CPU, ограничивая адреса значением 16-бит.
+// Обрабатывает заполнение TLB для CdM-16 CPU, ограничивая адреса значением
+// 16-бит.
 static bool cdm16_cpu_tlb_fill(CPUState *cs, vaddr addr, int size,
                                MMUAccessType access_type, int mmu_idx,
-                               bool probe, uintptr_t retaddr)
-{
+                               bool probe, uintptr_t retaddr) {
     vaddr address;
 
     (void)size;
@@ -218,12 +230,8 @@ static bool cdm16_cpu_tlb_fill(CPUState *cs, vaddr addr, int size,
 
     address = (addr & 0xffff) & TARGET_PAGE_MASK;
 
-    tlb_set_page(cs,
-                 address,
-                 address,
-                 PAGE_READ | PAGE_WRITE | PAGE_EXEC,
-                 mmu_idx,
-                 TARGET_PAGE_SIZE);
+    tlb_set_page(cs, address, address, PAGE_READ | PAGE_WRITE | PAGE_EXEC,
+                 mmu_idx, TARGET_PAGE_SIZE);
 
     return true;
 }
@@ -232,7 +240,6 @@ static bool cdm16_cpu_tlb_fill(CPUState *cs, vaddr addr, int size,
 static const SysemuCPUOps cdm16_sysemu_ops = {
     .has_work = cdm16_cpu_has_work,
 };
-
 
 // Все CdM-16 CPU используют один и тот же набор функций TCG.
 static const TCGCPUOps cdm16_tcg_ops = {
@@ -255,26 +262,17 @@ static const TCGCPUOps cdm16_tcg_ops = {
 };
 
 // все CdM-16 CPU работают вот так
-static void cdm16_cpu_class_init(ObjectClass *klass, const void *data)
-{
+static void cdm16_cpu_class_init(ObjectClass *klass, const void *data) {
     DeviceClass *dc = DEVICE_CLASS(klass);
     CPUClass *cc = CPU_CLASS(klass);
     CDM16CPUClass *ccc = CDM16_CPU_CLASS(klass);
     ResettableClass *rc = RESETTABLE_CLASS(klass);
 
-    device_class_set_parent_realize(
-        dc,
-        cdm16_cpu_realize,
-        &ccc->parent_realize
-    );
+    device_class_set_parent_realize(dc, cdm16_cpu_realize,
+                                    &ccc->parent_realize);
 
-    resettable_class_set_parent_phases(
-        rc,
-        NULL,
-        cdm16_cpu_reset_hold,
-        NULL,
-        &ccc->parent_phases
-    );
+    resettable_class_set_parent_phases(rc, NULL, cdm16_cpu_reset_hold, NULL,
+                                       &ccc->parent_phases);
 
     cc->set_pc = cdm16_cpu_set_pc;
     cc->get_pc = cdm16_cpu_get_pc;
@@ -288,20 +286,23 @@ static void cdm16_cpu_class_init(ObjectClass *klass, const void *data)
 // "Я хочу создать новый тип объекта".
 static const TypeInfo cdm16_cpu_type_info = {
     .name = TYPE_CDM16_CPU, // имя нового типа объекта
-    .parent = TYPE_CPU, // родительский тип объекта
+    .parent = TYPE_CPU,     // родительский тип объекта
 
     .instance_size = sizeof(CDM16CPU), // размер экземпляра нового типа объекта
-    .instance_align = __alignof(CDM16CPU), // выравнивание экземпляра нового типа объекта
+    .instance_align =
+        __alignof(CDM16CPU), // выравнивание экземпляра нового типа объекта
 
     .class_size = sizeof(CDM16CPUClass), // размер класса нового типа объекта
-    .class_init = cdm16_cpu_class_init, // когда QOM создаст класс cdm16-cpu, вызови cdm16_cpu_class_init().
+    .class_init = cdm16_cpu_class_init, // когда QOM создаст класс cdm16-cpu,
+                                        // вызови cdm16_cpu_class_init().
 };
 
-// Регистрируем новый тип объекта в QOM, чтобы QOM знал о нашем новом типе объекта.
-static void cdm16_cpu_register_types(void)
-{
+// Регистрируем новый тип объекта в QOM, чтобы QOM знал о нашем новом типе
+// объекта.
+static void cdm16_cpu_register_types(void) {
     type_register_static(&cdm16_cpu_type_info);
 }
 
-// Инициализация типов QOM. QOM вызывает эту функцию, чтобы зарегистрировать все типы объектов, которые мы создали.
+// Инициализация типов QOM. QOM вызывает эту функцию, чтобы зарегистрировать все
+// типы объектов, которые мы создали.
 type_init(cdm16_cpu_register_types)

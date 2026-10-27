@@ -8,12 +8,6 @@
 #endif
 
 
-#define CDM16_EXCP_UNALIGNED_SP   1
-#define CDM16_EXCP_UNALIGNED_PC   2
-#define CDM16_EXCP_INVALID_INSN   3
-#define CDM16_EXCP_DOUBLE_FAULT   4
-
-
 #define CDM16_NUM_REGS 8
 
 #define CDM16_PSR_N (1u << 0)
@@ -23,6 +17,13 @@
 #define CDM16_PSR_I (1u << 15)
 
 #define CDM16_FP_REG 7
+
+typedef enum {
+    CDM16_EXCP_UNALIGNED_SP = 1,
+    CDM16_EXCP_UNALIGNED_PC = 2,
+    CDM16_EXCP_INVALID_INSN = 3,
+    CDM16_EXCP_DOUBLE_FAULT = 4,
+} CdM16Exception;
 
 // 32 так как для QEMU лучше 32
 typedef struct CPUArchState {
