@@ -6,6 +6,8 @@ cdm16_ss.add(files(
   'decode.c',
   'helper.c',
   'trans-011.c',
+  'trans-001.c',
+  'gen-branch.c',
 ))
 
 target_arch += {
