@@ -1,7 +1,10 @@
-#include "cpu.h"
-#include "accel/tcg/cpu-ops.h"
-#include "qapi/error.h"
+
 #include "qemu/osdep.h"
+
+#include "accel/tcg/cpu-ops.h"
+#include "cpu.h"
+#include "qapi/error.h"
+
 #include "qemu/qemu-print.h"
 
 #include "accel/tcg/cpu-ops.h"
@@ -26,10 +29,6 @@ static bool cdm16_enter_exception(CPUState *cs, unsigned exception) {
     if (env->sp & 1) {
         return false;
     }
-
-    CPUCdM16State *env = cpu_env(cs);
-
-    uint32_t exception = cs->exception_index;
 
     /* Адрес записи в таблице векторов */
     uint32_t vector_addr = exception * 4;
@@ -293,8 +292,8 @@ static const TypeInfo cdm16_cpu_type_info = {
         __alignof(CDM16CPU), // выравнивание экземпляра нового типа объекта
 
     .class_size = sizeof(CDM16CPUClass), // размер класса нового типа объекта
-    .class_init = cdm16_cpu_class_init, // когда QOM создаст класс cdm16-cpu,
-                                        // вызови cdm16_cpu_class_init().
+    .class_init = cdm16_cpu_class_init,  // когда QOM создаст класс cdm16-cpu,
+                                         // вызови cdm16_cpu_class_init().
 };
 
 // Регистрируем новый тип объекта в QOM, чтобы QOM знал о нашем новом типе

@@ -42,4 +42,8 @@ void cdm16_gen_stps(unsigned rd);
 void cdm16_gen_ldpc(unsigned rd, uint32_t insn_pc);
 void cdm16_gen_stpc(unsigned rd, uint32_t fault_pc);
 void cdm16_gen_addsp(unsigned rd, uint32_t fault_pc);
+
+
+/* Группа 01000 */
+void cdm16_gen_mov(unsigned rs, unsigned rd);
 #endif
