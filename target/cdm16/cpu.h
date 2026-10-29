@@ -18,6 +18,9 @@
 
 #define CDM16_FP_REG 7
 
+#define CDM16_MMU_CODE 0
+#define CDM16_MMU_DATA 1
+
 typedef enum {
     CDM16_EXCP_UNALIGNED_SP = 1,
     CDM16_EXCP_UNALIGNED_PC = 2,
@@ -38,6 +41,8 @@ typedef struct CPUArchState {
 struct ArchCPU {
     CPUState parent_obj;
     CPUCdM16State env;
+
+    bool harvard;
 };
 
 struct CDM16CPUClass {

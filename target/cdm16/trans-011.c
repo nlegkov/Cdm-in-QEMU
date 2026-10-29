@@ -1,6 +1,7 @@
 #include "qemu/osdep.h"
 #include "tcg/tcg-op.h"
 #include "translate.h"
+#include "cpu.h"
 
 void cdm16_gen_lsw(unsigned rd, int32_t imm) {
     TCGv_i32 addr = tcg_temp_new_i32();
@@ -11,7 +12,7 @@ void cdm16_gen_lsw(unsigned rd, int32_t imm) {
     tcg_gen_andi_i32(addr, addr, 0xffff);
 
     /* rd = memory[addr] */
-    tcg_gen_qemu_ld_i32(cdm16_tcg_reg(rd), addr, 0, MO_LEUW);
+    tcg_gen_qemu_ld_i32(cdm16_tcg_reg(rd), addr, CDM16_MMU_DATA, MO_LEUW);
 }
 
 void cdm16_gen_lsb(unsigned rd, int32_t imm) {
@@ -24,7 +25,7 @@ void cdm16_gen_lsb(unsigned rd, int32_t imm) {
     tcg_gen_andi_i32(addr, addr, 0xffff);
 
     /* rd = memory[addr] */
-    tcg_gen_qemu_ld_i32(cdm16_tcg_reg(rd), addr, 0, MO_UB);
+    tcg_gen_qemu_ld_i32(cdm16_tcg_reg(rd), addr, CDM16_MMU_DATA, MO_UB);
 }
 
 void cdm16_gen_lssb(unsigned rd, int32_t imm) {
@@ -34,7 +35,7 @@ void cdm16_gen_lssb(unsigned rd, int32_t imm) {
     tcg_gen_addi_i32(addr, cdm16_tcg_reg(7), imm);
     tcg_gen_andi_i32(addr, addr, 0xffff);
 
-    tcg_gen_qemu_ld_i32(reg, addr, 0, MO_SB);
+    tcg_gen_qemu_ld_i32(reg, addr, CDM16_MMU_DATA, MO_SB);
 
     tcg_gen_andi_i32(reg, reg, 0xffff);
 }
@@ -48,7 +49,7 @@ void cdm16_gen_ssw(unsigned rd, int32_t imm) {
     tcg_gen_andi_i32(addr, addr, 0xffff);
 
     /* memory[addr] = rd */
-    tcg_gen_qemu_st_i32(cdm16_tcg_reg(rd), addr, 0, MO_LEUW);
+    tcg_gen_qemu_st_i32(cdm16_tcg_reg(rd), addr, CDM16_MMU_DATA, MO_LEUW);
 }
 
 void cdm16_gen_ssb(unsigned rd, int32_t imm) {
@@ -60,7 +61,7 @@ void cdm16_gen_ssb(unsigned rd, int32_t imm) {
     tcg_gen_andi_i32(addr, addr, 0xffff);
 
     /* memory[addr] = rd */
-    tcg_gen_qemu_st_i32(cdm16_tcg_reg(rd), addr, 0, MO_UB);
+    tcg_gen_qemu_st_i32(cdm16_tcg_reg(rd), addr, CDM16_MMU_DATA, MO_UB);
 }
 
 void cdm16_gen_ldi_short(unsigned rd, int32_t imm) {

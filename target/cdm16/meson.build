@@ -8,6 +8,7 @@ cdm16_ss.add(files(
   'trans-011.c',
   'trans-001.c',
   'trans-01000.c',
+  'trans-01010.c',
   'trans-branch.c',
 ))
 

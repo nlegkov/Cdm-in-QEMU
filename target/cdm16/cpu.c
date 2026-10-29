@@ -183,10 +183,9 @@ static TCGTBCPUState cdm16_get_tb_cpu_state(CPUState *cs) {
 }
 
 // CdM-16 CPU не поддерживает MMU, поэтому всегда возвращаем 0.
-static int cdm16_cpu_mmu_index(CPUState *cs, bool ifetch) {
-    (void)cs;
-    (void)ifetch;
-    return 0;
+static int cdm16_cpu_mmu_index(CPUState *cs, bool ifetch)
+{
+    return ifetch ? CDM16_MMU_CODE : CDM16_MMU_DATA;
 }
 
 // Пока без поддержки прерываний, поэтому всегда возвращаем false.
@@ -220,17 +219,23 @@ static vaddr cdm16_cpu_pointer_wrap(CPUState *cs, int mmu_idx, vaddr result,
 static bool cdm16_cpu_tlb_fill(CPUState *cs, vaddr addr, int size,
                                MMUAccessType access_type, int mmu_idx,
                                bool probe, uintptr_t retaddr) {
-    vaddr address;
+    CDM16CPU *cpu = CDM16_CPU(cs);
 
-    (void)size;
-    (void)access_type;
-    (void)probe;
-    (void)retaddr;
+    vaddr vpage = addr & TARGET_PAGE_MASK;
+    hwaddr ppage = (addr & 0xffff) & TARGET_PAGE_MASK;
 
-    address = (addr & 0xffff) & TARGET_PAGE_MASK;
+    int prot = PAGE_READ | PAGE_WRITE | PAGE_EXEC;
 
-    tlb_set_page(cs, address, address, PAGE_READ | PAGE_WRITE | PAGE_EXEC,
-                 mmu_idx, TARGET_PAGE_SIZE);
+    if (cpu->harvard) {
+        if (mmu_idx == CDM16_MMU_DATA) {
+            ppage += 0x10000;
+            prot = PAGE_READ | PAGE_WRITE;
+        } else {
+            prot = PAGE_READ | PAGE_EXEC;
+        }
+    }
+
+    tlb_set_page(cs, vpage, ppage, prot, mmu_idx, TARGET_PAGE_SIZE);
 
     return true;
 }
