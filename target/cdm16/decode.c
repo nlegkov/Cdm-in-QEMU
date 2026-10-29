@@ -158,6 +158,50 @@ static int decode_01000(uint16_t insn) {
     }
 }
 
+static int decode_01010(uint16_t insn) {
+    /* Формат: 01010 op_type(5) rs(3) rd(3) */
+    unsigned op_type = (insn >> 6) & 0b11111;
+    unsigned rs = (insn >> 3) & 0b111;
+    unsigned rd = insn & 0b111;
+
+    switch (op_type) {
+    case 0b00000: // ldw rs, rd
+        cdm16_gen_ldw(rs, rd);
+        return 2;
+
+    case 0b00001: // ldb rs, rd
+        cdm16_gen_ldb(rs, rd);
+        return 2;
+
+    case 0b00010: // ldsb rs, rd
+        cdm16_gen_ldsb(rs, rd);
+        return 2;
+
+    case 0b00011: // lcw rs, rd
+        cdm16_gen_lcw(rs, rd);
+        return 2;
+
+    case 0b00100: // lcb rs, rd
+        cdm16_gen_lcb(rs, rd);
+        return 2;
+
+    case 0b00101: // lcsb rs, rd
+        cdm16_gen_lcsb(rs, rd);
+        return 2;
+
+    case 0b00110: // stw rs, rd
+        cdm16_gen_stw(rs, rd);
+        return 2;
+    
+    case 0b00111: // stb rs, rd
+        cdm16_gen_stb(rs, rd);
+        return 2;
+
+    default:
+        return 0;
+    }
+}
+
 static int decode_group_000(CPUCdM16State *env, DisasContextBase *db,
                             uint16_t insn) {
     switch (insn >> 12) {
@@ -185,7 +229,7 @@ static int decode_group_010(CPUCdM16State *env, DisasContextBase *db,
         return decode_01000(insn);
 
     case 0b01010:
-        return 0; // return decode_01010(env, db, insn);
+        return decode_01010(insn); // return decode_01010(env, db, insn);
     }
 
     return 0;

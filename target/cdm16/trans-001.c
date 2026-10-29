@@ -16,7 +16,7 @@ void cdm16_gen_push_rd(unsigned rd) {
     tcg_gen_andi_i32(sp, sp, 0xffff);
 
     /* Записываем значение регистра в память по адресу SP */
-    tcg_gen_qemu_st_i32(reg, sp, 0, MO_LEUW);
+    tcg_gen_qemu_st_i32(reg, sp, CDM16_MMU_DATA, MO_LEUW);
 }
 
 void cdm16_gen_pop_rd(unsigned rd) {
@@ -24,7 +24,7 @@ void cdm16_gen_pop_rd(unsigned rd) {
     TCGv_i32 reg = cdm16_tcg_reg(rd);
 
     /* Читаем значение из памяти по адресу SP */
-    tcg_gen_qemu_ld_i32(reg, sp, 0, MO_LEUW);
+    tcg_gen_qemu_ld_i32(reg, sp, CDM16_MMU_DATA, MO_LEUW);
 
     /* Прибавляем 2 к SP */
     tcg_gen_addi_i32(sp, sp, 2);
@@ -57,7 +57,7 @@ void cdm16_gen_jsrr(unsigned rd, uint32_t insn_pc) {
     cdm16_gen_write_sp(new_sp, insn_pc);
 
     /* Сохраняем адрес возврата в стек */
-    tcg_gen_qemu_st_i32(tcg_constant_i32(return_pc), sp, 0, MO_LEUW);
+    tcg_gen_qemu_st_i32(tcg_constant_i32(return_pc), sp, CDM16_MMU_DATA, MO_LEUW);
 
     /* PC = rd с проверкой выравнивания */
     cdm16_gen_write_pc(reg, insn_pc);

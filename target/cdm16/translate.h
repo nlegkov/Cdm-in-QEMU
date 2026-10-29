@@ -46,4 +46,14 @@ void cdm16_gen_addsp(unsigned rd, uint32_t fault_pc);
 
 /* Группа 01000 */
 void cdm16_gen_mov(unsigned rs, unsigned rd);
+
+/* Группа 01010 */
+void cdm16_gen_ldw(unsigned rs, unsigned rd);
+void cdm16_gen_ldb(unsigned rs, unsigned rd);
+void cdm16_gen_ldsb(unsigned rs, unsigned rd);
+void cdm16_gen_lcw(unsigned rs, unsigned rd);
+void cdm16_gen_lcb(unsigned rs, unsigned rd);
+void cdm16_gen_lcsb(unsigned rs, unsigned rd);
+void cdm16_gen_stw(unsigned rs, unsigned rd);
+void cdm16_gen_stb(unsigned rs, unsigned rd);
 #endif
