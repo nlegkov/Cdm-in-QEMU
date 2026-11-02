@@ -202,6 +202,51 @@ static int decode_01010(uint16_t insn) {
     }
 }
 
+static int decode_1011(uint16_t insn) {
+    /* Формат: 1011 alu_op(3) rs1(3) rs0(3) rd(3) */
+    unsigned alu_op = (insn >> 9) & 0b111;
+    unsigned rs1 = (insn >> 6) & 0b111;
+    unsigned rs0 = (insn >> 3) & 0b111;
+    unsigned rd = insn & 0b111;
+
+    switch (alu_op) {
+    case 0b000: // AND rs0, rs1, rd
+        cdm16_gen_and(rs0, rs1, rd);
+        return 2;
+
+    case 0b001: // OR rs0, rs1, rd
+        cdm16_gen_or(rs0, rs1, rd);
+        return 2;
+
+    case 0b010: // XOR rs0, rs1, rd
+        cdm16_gen_xor(rs0, rs1, rd);
+        return 2;
+
+    case 0b011: // BIC rs0, rs1, rd
+        cdm16_gen_bic(rs0, rs1, rd);
+        return 2;
+
+    case 0b100: // ADD rs0, rs1, rd
+        cdm16_gen_add(rs0, rs1, rd);
+        return 2;
+
+    case 0b101: // ADDC rs0, rs1, rd
+        cdm16_gen_addc(rs0, rs1, rd);
+        return 2;
+
+    case 0b110: // SUB rs0, rs1, rd
+        cdm16_gen_sub(rs0, rs1, rd);
+        return 2;
+        
+    case 0b111: // SUBC rs0, rs1, rd
+        cdm16_gen_subc(rs0, rs1, rd);
+        return 2;
+
+    default:
+        return 0;
+    }
+}
+
 static int decode_group_000(CPUCdM16State *env, DisasContextBase *db,
                             uint16_t insn) {
     switch (insn >> 12) {
@@ -235,6 +280,16 @@ static int decode_group_010(CPUCdM16State *env, DisasContextBase *db,
     return 0;
 }
 
+static int decode_group_101(CPUCdM16State *env, DisasContextBase *db, uint16_t insn) {
+
+    switch (insn >> 12) {
+        case 0b1011:
+            return decode_1011(insn);
+    }
+
+    return 0;
+}
+
 int cdm16_decode_instruction(CPUCdM16State *env, DisasContextBase *db,
                              uint16_t insn) {
     (void)env;
@@ -257,8 +312,7 @@ int cdm16_decode_instruction(CPUCdM16State *env, DisasContextBase *db,
         return 0; // Позже decode_100
 
     case 0b101:
-        return 0; // Позже decode_group_101
-
+        return decode_group_101(env, db, insn); // Позже decode_group_101
     case 0b110:
     case 0b111:
         return 0; // Позже decode_branch

@@ -56,4 +56,15 @@ void cdm16_gen_lcb(unsigned rs, unsigned rd);
 void cdm16_gen_lcsb(unsigned rs, unsigned rd);
 void cdm16_gen_stw(unsigned rs, unsigned rd);
 void cdm16_gen_stb(unsigned rs, unsigned rd);
+
+/* Группа 1011 */
+void cdm16_gen_and(unsigned rs0, unsigned rs1, unsigned rd);
+void cdm16_gen_or(unsigned rs0, unsigned rs1, unsigned rd);
+void cdm16_gen_xor(unsigned rs0, unsigned rs1, unsigned rd);
+void cdm16_gen_bic(unsigned rs0, unsigned rs1, unsigned rd);
+void cdm16_gen_add(unsigned rs0, unsigned rs1, unsigned rd);
+void cdm16_gen_addc(unsigned rs0, unsigned rs1, unsigned rd);
+void cdm16_gen_sub(unsigned rs0, unsigned rs1, unsigned rd);
+void cdm16_gen_subc(unsigned rs0, unsigned rs1, unsigned rd);
+
 #endif
