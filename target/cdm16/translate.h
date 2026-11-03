@@ -67,4 +67,14 @@ void cdm16_gen_addc(unsigned rs0, unsigned rs1, unsigned rd);
 void cdm16_gen_sub(unsigned rs0, unsigned rs1, unsigned rd);
 void cdm16_gen_subc(unsigned rs0, unsigned rs1, unsigned rd);
 
+/* Группа 1010 */
+void cdm16_gen_ldw_add(unsigned rs1, unsigned rs2, unsigned rd);
+void cdm16_gen_ldb_add(unsigned rs1, unsigned rs2, unsigned rd);
+void cdm16_gen_ldsb_add(unsigned rs1, unsigned rs2, unsigned rd);
+void cdm16_gen_stw_add(unsigned rs1, unsigned rs2, unsigned rd);
+void cdm16_gen_stb_add(unsigned rs1, unsigned rs2, unsigned rd);
+void cdm16_gen_lcw_add(unsigned rs1, unsigned rs2, unsigned rd);
+void cdm16_gen_lcb_add(unsigned rs1, unsigned rs2, unsigned rd);
+void cdm16_gen_lcsb_add(unsigned rs1, unsigned rs2, unsigned rd);
+
 #endif
