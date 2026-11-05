@@ -72,4 +72,43 @@ void cdm16_gen_stb(unsigned rs, unsigned rd);
 
 /* Группа 100*/
 void cdm16_gen_int_imm9(uint16_t vector, uint32_t insn_pc);
+/* Группа 1011 */
+void cdm16_gen_and(unsigned rs0, unsigned rs1, unsigned rd);
+void cdm16_gen_or(unsigned rs0, unsigned rs1, unsigned rd);
+void cdm16_gen_xor(unsigned rs0, unsigned rs1, unsigned rd);
+void cdm16_gen_bic(unsigned rs0, unsigned rs1, unsigned rd);
+void cdm16_gen_add(unsigned rs0, unsigned rs1, unsigned rd);
+void cdm16_gen_addc(unsigned rs0, unsigned rs1, unsigned rd);
+void cdm16_gen_sub(unsigned rs0, unsigned rs1, unsigned rd);
+void cdm16_gen_subc(unsigned rs0, unsigned rs1, unsigned rd);
+
+/* Группа 1010 */
+void cdm16_gen_ldw_add(unsigned rs1, unsigned rs2, unsigned rd);
+void cdm16_gen_ldb_add(unsigned rs1, unsigned rs2, unsigned rd);
+void cdm16_gen_ldsb_add(unsigned rs1, unsigned rs2, unsigned rd);
+void cdm16_gen_stw_add(unsigned rs1, unsigned rs2, unsigned rd);
+void cdm16_gen_stb_add(unsigned rs1, unsigned rs2, unsigned rd);
+void cdm16_gen_lcw_add(unsigned rs1, unsigned rs2, unsigned rd);
+void cdm16_gen_lcb_add(unsigned rs1, unsigned rs2, unsigned rd);
+void cdm16_gen_lcsb_add(unsigned rs1, unsigned rs2, unsigned rd);
+
+/* Группа 01011 */
+void cdm16_gen_neg(unsigned rs, unsigned rd);
+void cdm16_gen_not(unsigned rs, unsigned rd);
+void cdm16_gen_sxt(unsigned rs, unsigned rd);
+void cdm16_gen_scl(unsigned rs, unsigned rd);
+
+/* Группа 01001 */
+void cdm16_gen_bit(unsigned rs, unsigned rd);
+void cdm16_gen_cmp(unsigned rs, unsigned rd);
+
+/* Группа 0001 */
+void cdm16_gen_shl(unsigned rs, unsigned rd, int32_t shift_val);
+void cdm16_gen_shr(unsigned rs, unsigned rd, int32_t shift_val);
+void cdm16_gen_shra(unsigned rs, unsigned rd, int32_t shift_val);
+void cdm16_gen_rol(unsigned rs, unsigned rd, int32_t shift_val);
+void cdm16_gen_ror(unsigned rs, unsigned rd, int32_t shift_val);
+void cdm16_gen_rcl(unsigned rs, unsigned rd, int32_t shift_val);
+void cdm16_gen_rcr(unsigned rs, unsigned rd, int32_t shift_val);
+
 #endif

@@ -80,6 +80,48 @@ static int decode_00000(CPUCdM16State *env, DisasContextBase *db,
     }
 }
 
+static int decode_0001(uint16_t insn) {
+    /* Формат: 0001 alu_op(3) shift_val(3) rs(3) rd(3) */
+
+    unsigned alu_op = (insn >> 9) & 0b111;
+    unsigned shift_val = ((insn >> 6) & 0b111) + 1;
+    unsigned rs = (insn >> 3) & 0b111;
+    unsigned rd = insn & 0b111;
+
+    switch (alu_op) {
+    case 0b000: // SHL rs rd shift_val
+        cdm16_gen_shl(rs, rd, shift_val);
+        return 2;
+
+    case 0b001: // SHR rs rd shift_val
+        cdm16_gen_shr(rs, rd, shift_val);
+        return 2;
+
+    case 0b010: // SHRA rs rd shift_val
+        cdm16_gen_shra(rs, rd, shift_val);
+        return 2;
+
+    case 0b011: // ROL rs rd shift_val
+        cdm16_gen_rol(rs, rd, shift_val);
+        return 2;
+
+    case 0b100: // ROR rs rd shift_val
+        cdm16_gen_ror(rs, rd, shift_val);
+        return 2;
+
+    case 0b101: // RCL rs rd shift_val
+        cdm16_gen_rcl(rs, rd, shift_val);
+        return 2;
+
+    case 0b110: // RCR rs rd shift_val
+        cdm16_gen_rcr(rs, rd, shift_val);
+        return 2;
+
+    default:
+        return 0;
+    }
+}
+
 static int decode_001(CPUCdM16State *env, DisasContextBase *db, uint16_t insn) {
     /* Формат: 001 000000 op_type(4) rd(3) */
 
@@ -249,6 +291,144 @@ static int decode_01010(uint16_t insn) {
     }
 }
 
+static int decode_1011(uint16_t insn) {
+    /* Формат: 1011 alu_op(3) rs1(3) rs0(3) rd(3) */
+    unsigned alu_op = (insn >> 9) & 0b111;
+    unsigned rs1 = (insn >> 6) & 0b111;
+    unsigned rs0 = (insn >> 3) & 0b111;
+    unsigned rd = insn & 0b111;
+
+    switch (alu_op) {
+    case 0b000: // AND rs0, rs1, rd
+        cdm16_gen_and(rs0, rs1, rd);
+        return 2;
+
+    case 0b001: // OR rs0, rs1, rd
+        cdm16_gen_or(rs0, rs1, rd);
+        return 2;
+
+    case 0b010: // XOR rs0, rs1, rd
+        cdm16_gen_xor(rs0, rs1, rd);
+        return 2;
+
+    case 0b011: // BIC rs0, rs1, rd
+        cdm16_gen_bic(rs0, rs1, rd);
+        return 2;
+
+    case 0b100: // ADD rs0, rs1, rd
+        cdm16_gen_add(rs0, rs1, rd);
+        return 2;
+
+    case 0b101: // ADDC rs0, rs1, rd
+        cdm16_gen_addc(rs0, rs1, rd);
+        return 2;
+
+    case 0b110: // SUB rs0, rs1, rd
+        cdm16_gen_sub(rs0, rs1, rd);
+        return 2;
+        
+    case 0b111: // SUBC rs0, rs1, rd
+        cdm16_gen_subc(rs0, rs1, rd);
+        return 2;
+
+    default:
+        return 0;
+    }
+}
+
+static int decode_1010(uint16_t insn) {
+    /* Формат: 1010 op_type(3) rs1(3) rs0(3) rd(3) */
+    unsigned alu_op = (insn >> 9) & 0b111;
+    unsigned rs1 = (insn >> 6) & 0b111;
+    unsigned rs0 = (insn >> 3) & 0b111;
+    unsigned rd = insn & 0b111;
+
+    switch (alu_op) {
+    case 0b000: // LDW rs0, rs1, rd
+        cdm16_gen_ldw_add(rs0, rs1, rd);
+        return 2;
+
+    case 0b001: // LDB rs0, rs1, rd
+        cdm16_gen_ldb_add(rs0, rs1, rd);
+        return 2;
+
+    case 0b010: // LDSB rs0, rs1, rd
+        cdm16_gen_ldsb_add(rs0, rs1, rd);
+        return 2;
+
+    case 0b011: // LCW rs0, rs1, rd
+        cdm16_gen_lcw_add(rs0, rs1, rd);
+        return 2;
+
+    case 0b100: // LCB rs0, rs1, rd 
+        cdm16_gen_lcb_add(rs0, rs1, rd);
+        return 2;
+
+    case 0b101: // LCSB rs0, rs1, rd    
+        cdm16_gen_lcsb_add(rs0, rs1, rd);
+        return 2;
+
+    case 0b110: // STW rs0, rs1, rd
+        cdm16_gen_stw_add(rs0, rs1, rd);
+        return 2;
+
+    case 0b111: // STB rs0, rs1, rd
+        cdm16_gen_stb_add(rs0, rs1, rd);
+        return 2;
+
+    default:
+        return 0;
+    }
+}
+
+static int decode_01001(uint16_t insn) {
+    /* Формат: 01001 alu_op(3) rs(3) rd(3) */
+    unsigned alu_op = (insn >> 6) & 0b111;
+    unsigned rs = (insn >> 3) & 0b111;
+    unsigned rd = insn & 0b111;
+
+    switch (alu_op) {
+    case 0b000: // BIT rs, rd
+        cdm16_gen_bit(rs, rd);
+        return 2;
+
+    case 0b110: // CMP rs, rd
+        cdm16_gen_cmp(rs, rd);
+        return 2;
+
+    default:
+        return 0;
+    }
+}
+
+static int decode_01011(uint16_t insn) {
+    /* Формат: 01011 alu_op(3) rs(3) rd(3) */
+    unsigned alu_op = (insn >> 6) & 0b111;
+    unsigned rs = (insn >> 3) & 0b111;
+    unsigned rd = insn & 0b111;
+
+    switch (alu_op) {
+    case 0b000: // NEG rs, rd
+        cdm16_gen_neg(rs, rd);
+        return 2;
+
+    case 0b001: // NOT rs, rd
+        cdm16_gen_not(rs, rd);
+        return 2;
+
+    case 0b010: // SXT rs, rd
+        cdm16_gen_sxt(rs, rd);
+        return 2;
+
+    case 0b011: // SCL rs, rd
+        cdm16_gen_scl(rs, rd);
+        return 2;
+
+    default:
+        return 0;
+    }
+}
+
 static int decode_group_000(CPUCdM16State *env, DisasContextBase *db,
                             uint16_t insn) {
     switch (insn >> 12) {
@@ -263,7 +443,7 @@ static int decode_group_000(CPUCdM16State *env, DisasContextBase *db,
         break;
 
     case 0b0001:
-        return 0; // return decode_0001(env, db, insn);
+        return decode_0001(insn); // return decode_0001(env, db, insn);
     }
 
     return 0;
@@ -277,6 +457,24 @@ static int decode_group_010(CPUCdM16State *env, DisasContextBase *db,
 
     case 0b01010:
         return decode_01010(insn); // return decode_01010(env, db, insn);
+    
+    case 0b01011:
+        return decode_01011(insn);
+
+    case 0b01001:
+        return decode_01001(insn);
+    }
+
+    return 0;
+}
+
+static int decode_group_101(CPUCdM16State *env, DisasContextBase *db, uint16_t insn) {
+
+    switch (insn >> 12) {
+        case 0b1011:
+            return decode_1011(insn);
+        case 0b1010:
+            return decode_1010(insn);
     }
 
     return 0;
@@ -323,8 +521,7 @@ int cdm16_decode_instruction(CPUCdM16State *env, DisasContextBase *db,
         return decode_100(env, db, insn); // Позже decode_100
 
     case 0b101:
-        return 0; // Позже decode_group_101
-
+        return decode_group_101(env, db, insn); // Позже decode_group_101
     case 0b110:
     case 0b111:
         return 0; // Позже decode_branch
