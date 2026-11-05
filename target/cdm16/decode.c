@@ -292,6 +292,26 @@ static int decode_1010(uint16_t insn) {
     }
 }
 
+static int decode_01001(uint16_t insn) {
+    /* Формат: 01001 alu_op(3) rs(3) rd(3) */
+    unsigned alu_op = (insn >> 6) & 0b111;
+    unsigned rs = (insn >> 3) & 0b111;
+    unsigned rd = insn & 0b111;
+
+    switch (alu_op) {
+    case 0b000: // BIT rs, rd
+        cdm16_gen_bit(rs, rd);
+        return 2;
+
+    case 0b110: // CMP rs, rd
+        cdm16_gen_cmp(rs, rd);
+        return 2;
+
+    default:
+        return 0;
+    }
+}
+
 static int decode_01011(uint16_t insn) {
     /* Формат: 01011 alu_op(3) rs(3) rd(3) */
     unsigned alu_op = (insn >> 6) & 0b111;
@@ -351,6 +371,9 @@ static int decode_group_010(CPUCdM16State *env, DisasContextBase *db,
     
     case 0b01011:
         return decode_01011(insn);
+
+    case 0b01001:
+        return decode_01001(insn);
     }
 
     return 0;

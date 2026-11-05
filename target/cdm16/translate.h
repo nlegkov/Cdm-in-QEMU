@@ -83,4 +83,8 @@ void cdm16_gen_not(unsigned rs, unsigned rd);
 void cdm16_gen_sxt(unsigned rs, unsigned rd);
 void cdm16_gen_scl(unsigned rs, unsigned rd);
 
+/* Группа 01001 */
+void cdm16_gen_bit(unsigned rs, unsigned rd);
+void cdm16_gen_cmp(unsigned rs, unsigned rd);
+
 #endif
