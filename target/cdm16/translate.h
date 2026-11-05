@@ -77,4 +77,10 @@ void cdm16_gen_lcw_add(unsigned rs1, unsigned rs2, unsigned rd);
 void cdm16_gen_lcb_add(unsigned rs1, unsigned rs2, unsigned rd);
 void cdm16_gen_lcsb_add(unsigned rs1, unsigned rs2, unsigned rd);
 
+/* Группа 01011 */
+void cdm16_gen_neg(unsigned rs, unsigned rd);
+void cdm16_gen_not(unsigned rs, unsigned rd);
+void cdm16_gen_sxt(unsigned rs, unsigned rd);
+void cdm16_gen_scl(unsigned rs, unsigned rd);
+
 #endif
