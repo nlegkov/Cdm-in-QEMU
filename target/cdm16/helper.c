@@ -47,3 +47,12 @@ void HELPER(cdm16_debug_addsp)(
         new_sp & 1
     );
 }
+
+void helper_cdm16_wait(CPUCdM16State *env)
+{
+    CPUState *cs = env_cpu(env);
+
+    cs->halted = 1;
+    cs->exception_index = EXCP_HLT;
+    cpu_loop_exit(cs);
+}

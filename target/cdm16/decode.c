@@ -1,6 +1,7 @@
 #include "qemu/osdep.h"
-#include "translate.h"
+
 #include "decode.h"
+#include "translate.h"
 
 static int decode_00000(CPUCdM16State *env, DisasContextBase *db,
                         uint16_t insn) {
@@ -28,6 +29,52 @@ static int decode_00000(CPUCdM16State *env, DisasContextBase *db,
         db->is_jmp = DISAS_NORETURN;
         return 2;
 
+    case 0b0101: /* WAIT */
+        cdm16_gen_wait((db->pc_next + 2) & 0xffff);
+        db->is_jmp = DISAS_NORETURN;
+        return 2;
+
+    case 0b0110: /* ei */
+        cdm16_gen_ei();
+        return 2;
+
+    case 0b0111: /* di */
+        cdm16_gen_di();
+        return 2;
+
+    case 0b1000: /* jsr labl */
+        uint16_t target =
+            translator_lduw_end(env, db, (db->pc_next + 2) & 0xffff, MO_LE);
+
+        cdm16_gen_jsr_label(target, db->pc_next);
+        db->is_jmp = DISAS_NORETURN;
+        return 4;
+
+    case 0b1001: /* rti */
+        cdm16_gen_rti(db->pc_next);
+        db->is_jmp = DISAS_NORETURN;
+        return 2;
+        
+    case 0b1010: /* pupc */
+        cdm16_gen_pupc(db->pc_next);
+        db->is_jmp = DISAS_NORETURN;
+        return 2;
+    case 0b1011: /* popc */
+        cdm16_gen_popc(db->pc_next);
+        db->is_jmp = DISAS_NORETURN;
+        return 2;
+    case 0b1100: /* pusp */
+        cdm16_gen_pusp(db->pc_next);
+        return 2;
+    case 0b1101: /* posp */
+        cdm16_gen_posp(db->pc_next);
+        return 2;
+    case 0b1110: /* pups */
+        cdm16_gen_pups(db->pc_next);
+        return 2;
+    case 0b1111: /* pops */
+        cdm16_gen_pops(db->pc_next);
+        return 2;
     default:
         return 0;
     }
@@ -234,7 +281,7 @@ static int decode_01010(uint16_t insn) {
     case 0b00110: // stw rs, rd
         cdm16_gen_stw(rs, rd);
         return 2;
-    
+
     case 0b00111: // stb rs, rd
         cdm16_gen_stb(rs, rd);
         return 2;
@@ -432,6 +479,25 @@ static int decode_group_101(CPUCdM16State *env, DisasContextBase *db, uint16_t i
 
     return 0;
 }
+static int decode_100(CPUCdM16State *env, DisasContextBase *db, uint16_t insn) {
+    /* Формат: 100 op_type(4) imm9 */
+    unsigned op_type = (insn >> 9) & 0b1111;
+    unsigned imm = insn & 0x1FF;
+
+    switch (op_type) {
+    case 0b0000: /* INT imm9 */
+        cdm16_gen_exception(imm, (db->pc_next + 2) & 0xffff);
+
+        db->is_jmp = DISAS_NORETURN;
+        return 2;
+
+        if (op_type & 0b1) {
+            imm -= 512;
+        }
+    }
+
+    return 0;
+}
 
 int cdm16_decode_instruction(CPUCdM16State *env, DisasContextBase *db,
                              uint16_t insn) {
@@ -452,7 +518,7 @@ int cdm16_decode_instruction(CPUCdM16State *env, DisasContextBase *db,
         return decode_011(insn);
 
     case 0b100:
-        return 0; // Позже decode_100
+        return decode_100(env, db, insn); // Позже decode_100
 
     case 0b101:
         return decode_group_101(env, db, insn); // Позже decode_group_101
