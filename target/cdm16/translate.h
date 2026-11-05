@@ -12,6 +12,7 @@ TCGv_i32 cdm16_tcg_ps(void);
 
 void cdm16_gen_exception(unsigned exception, uint32_t pc);
 void cdm16_gen_halt(uint16_t next_pc);
+void cdm16_gen_wait(uint16_t next_pc);
 
 // Генерация кода для записи значения в регистр PC
 void cdm16_gen_write_pc(TCGv_i32 value, uint32_t fault_pc);
@@ -19,6 +20,18 @@ void cdm16_gen_write_sp(TCGv_i32 value, uint32_t fault_pc);
 
 void cdm16_gen_branch(unsigned code, uint16_t target, uint16_t next_pc,
                       uint32_t fault_pc);
+
+/* Группа 00000 */
+void cdm16_gen_ei(void);
+void cdm16_gen_di(void);
+void cdm16_gen_rti(uint32_t insn_pc);
+void cdm16_gen_jsr_label(uint16_t target, uint32_t insn_pc);
+void cdm16_gen_pupc(uint32_t insn_pc);
+void cdm16_gen_popc(uint32_t insn_pc);
+void cdm16_gen_pusp(uint32_t insn_pc);
+void cdm16_gen_posp(uint32_t insn_pc);
+void cdm16_gen_pups(uint32_t insn_pc);
+void cdm16_gen_pops(uint32_t insn_pc);
 
 /* Группа 011 */
 void cdm16_gen_lsw(unsigned rd, int32_t imm);
@@ -56,4 +69,7 @@ void cdm16_gen_lcb(unsigned rs, unsigned rd);
 void cdm16_gen_lcsb(unsigned rs, unsigned rd);
 void cdm16_gen_stw(unsigned rs, unsigned rd);
 void cdm16_gen_stb(unsigned rs, unsigned rd);
+
+/* Группа 100*/
+void cdm16_gen_int_imm9(uint16_t vector, uint32_t insn_pc);
 #endif

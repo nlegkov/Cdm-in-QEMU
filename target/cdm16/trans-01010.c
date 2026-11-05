@@ -1,7 +1,8 @@
 #include "qemu/osdep.h"
+
+#include "cpu.h"
 #include "tcg/tcg-op.h"
 #include "translate.h"
-#include "cpu.h"
 
 /* Получение 16-битного адреса */
 static TCGv_i32 cdm16_mem_addr(unsigned rs) {

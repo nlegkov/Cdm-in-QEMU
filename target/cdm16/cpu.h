@@ -21,6 +21,11 @@
 #define CDM16_MMU_CODE 0
 #define CDM16_MMU_DATA 1
 
+#define CDM16_EXCP_INT 0x1000
+#define CDM16_EXCP_IRQ 0x1001
+
+#define CDM16_IRQ_VECTOR 5
+
 typedef enum {
     CDM16_EXCP_UNALIGNED_SP = 1,
     CDM16_EXCP_UNALIGNED_PC = 2,
@@ -35,6 +40,8 @@ typedef struct CPUArchState {
     uint32_t sp;
     uint32_t pc;
     uint32_t ps;
+
+    uint16_t pending_vector;
 } CPUCdM16State;
 
 

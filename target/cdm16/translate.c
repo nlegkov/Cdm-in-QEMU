@@ -191,3 +191,9 @@ void cdm16_gen_halt(uint16_t next_pc) {
     tcg_gen_movi_i32(cpu_pc, next_pc);
     gen_helper_halt(tcg_env);
 }
+
+void cdm16_gen_wait(uint16_t next_pc)
+{
+    tcg_gen_movi_i32(cpu_pc, next_pc);
+    gen_helper_cdm16_wait(tcg_env);
+}

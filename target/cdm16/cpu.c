@@ -18,6 +18,9 @@
 #include "system/address-spaces.h"
 #include "system/memory.h"
 
+#include "exec/cpu-interrupt.h"
+#include "hw/core/qdev.h"
+
 static bool cdm16_enter_exception(CPUState *cs, unsigned exception) {
     CPUCdM16State *env = cpu_env(cs);
 
@@ -33,6 +36,7 @@ static bool cdm16_enter_exception(CPUState *cs, unsigned exception) {
     /* Адрес записи в таблице векторов */
     uint32_t vector_addr = exception * 4;
 
+    uint32_t old_sp = env->sp;
     uint32_t old_pc = env->pc & 0xffff;
     uint32_t old_ps = env->ps & 0xffff;
 
@@ -44,11 +48,28 @@ static bool cdm16_enter_exception(CPUState *cs, unsigned exception) {
     env->sp = (env->sp - 2) & 0xffff;
     cpu_stw_le_data(env, env->sp, old_pc);
 
-    /* Загружаем адрес обработчика */
-    env->pc = cpu_lduw_le_data(env, vector_addr);
+    uint32_t new_pc =
+        cpu_lduw_le_mmuidx_ra(env, vector_addr, CDM16_MMU_CODE, 0);
 
-    /* Загружаем новый PS */
-    env->ps = cpu_lduw_le_data(env, vector_addr + 2);
+    /*
+     * Ошибка возникла во время входа в обработчик.
+     * Возвращаем false, чтобы вызывающая функция
+     * перешла к DOUBLE_FAULT.
+     */
+    if (new_pc & 1) {
+        /*
+         * Вход не завершён. Возвращаем SP, чтобы вход
+         * в DOUBLE_FAULT использовал исходную вершину стека.
+         */
+        env->sp = old_sp;
+        return false;
+    }
+
+    uint32_t new_ps =
+        cpu_lduw_le_mmuidx_ra(env, vector_addr + 2, CDM16_MMU_CODE, 0);
+
+    env->pc = new_pc;
+    env->ps = new_ps;
 
     return true;
 }
@@ -172,6 +193,23 @@ static void cdm16_cpu_dump_state(CPUState *cs, FILE *f, int flags) {
                  (unsigned)env->regs[6], (unsigned)env->regs[7]);
 }
 
+static void cdm16_cpu_set_irq(void *opaque, int irq, int level) {
+    CDM16CPU *cpu = opaque;
+    CPUState *cs = CPU(cpu);
+
+    (void)irq;
+
+    if (level) {
+        cpu_interrupt(cs, CPU_INTERRUPT_HARD);
+    } else {
+        cpu_reset_interrupt(cs, CPU_INTERRUPT_HARD);
+    }
+}
+
+static void cdm16_cpu_initfn(Object *obj) {
+    qdev_init_gpio_in(DEVICE(obj), cdm16_cpu_set_irq, 1);
+}
+
 // Возвращает состояние процессора CdM-16 для TCG.
 static TCGTBCPUState cdm16_get_tb_cpu_state(CPUState *cs) {
     CPUCdM16State *env = cpu_env(cs);
@@ -182,25 +220,42 @@ static TCGTBCPUState cdm16_get_tb_cpu_state(CPUState *cs) {
     };
 }
 
-// CdM-16 CPU не поддерживает MMU, поэтому всегда возвращаем 0.
-static int cdm16_cpu_mmu_index(CPUState *cs, bool ifetch)
-{
+static int cdm16_cpu_mmu_index(CPUState *cs, bool ifetch) {
     return ifetch ? CDM16_MMU_CODE : CDM16_MMU_DATA;
 }
 
-// Пока без поддержки прерываний, поэтому всегда возвращаем false.
+// Возвращает true, если процессор CdM-16 имеет работу для выполнения.
 static bool cdm16_cpu_has_work(CPUState *cs) {
-    (void)cs;
+    CPUCdM16State *env = cpu_env(cs);
 
-    return false;
+    return cpu_test_interrupt(cs, CPU_INTERRUPT_HARD) &&
+           (env->ps & CDM16_PSR_I) != 0;
 }
 
 // Отвечает за обработку прерываний.
 static bool cdm16_cpu_exec_interrupt(CPUState *cs, int interrupt_request) {
-    (void)cs;
-    (void)interrupt_request;
+    CPUCdM16State *env = cpu_env(cs);
 
-    return false;
+    if (!(interrupt_request & CPU_INTERRUPT_HARD)) {
+        return false;
+    }
+
+    if (!(env->ps & CDM16_PSR_I)) {
+        return false;
+    }
+
+    /*
+     * env->pc уже содержит адрес продолжения.
+     * Для внешнего IRQ прибавлять 2 не нужно.
+     */
+    cs->exception_index = CDM16_IRQ_VECTOR;
+    cdm16_cpu_do_interrupt(cs);
+
+    /*
+     * Линию здесь не сбрасываем:
+     * устройство должно опустить её после подтверждения.
+     */
+    return true;
 }
 
 // Обрабатывает изменения указателей в адресном пространстве CdM-16, ограничивая
@@ -299,6 +354,7 @@ static const TypeInfo cdm16_cpu_type_info = {
     .class_size = sizeof(CDM16CPUClass), // размер класса нового типа объекта
     .class_init = cdm16_cpu_class_init,  // когда QOM создаст класс cdm16-cpu,
                                          // вызови cdm16_cpu_class_init().
+    .instance_init = cdm16_cpu_initfn,
 };
 
 // Регистрируем новый тип объекта в QOM, чтобы QOM знал о нашем новом типе

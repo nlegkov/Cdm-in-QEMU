@@ -5,10 +5,12 @@ cdm16_ss.add(files(
   'translate.c',
   'decode.c',
   'helper.c',
+  'trans-00000.c',
   'trans-011.c',
   'trans-001.c',
   'trans-01000.c',
   'trans-01010.c',
+  'trans-100.c',
   'trans-branch.c',
 ))
 
