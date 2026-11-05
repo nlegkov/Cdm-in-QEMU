@@ -87,4 +87,13 @@ void cdm16_gen_scl(unsigned rs, unsigned rd);
 void cdm16_gen_bit(unsigned rs, unsigned rd);
 void cdm16_gen_cmp(unsigned rs, unsigned rd);
 
+/* Группа 0001 */
+void cdm16_gen_shl(unsigned rs, unsigned rd, int32_t shift_val);
+void cdm16_gen_shr(unsigned rs, unsigned rd, int32_t shift_val);
+void cdm16_gen_shra(unsigned rs, unsigned rd, int32_t shift_val);
+void cdm16_gen_rol(unsigned rs, unsigned rd, int32_t shift_val);
+void cdm16_gen_ror(unsigned rs, unsigned rd, int32_t shift_val);
+void cdm16_gen_rcl(unsigned rs, unsigned rd, int32_t shift_val);
+void cdm16_gen_rcr(unsigned rs, unsigned rd, int32_t shift_val);
+
 #endif
