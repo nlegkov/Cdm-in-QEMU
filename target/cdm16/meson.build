@@ -12,6 +12,7 @@ cdm16_ss.add(files(
   'trans-branch.c',
   'trans-1011.c',
   'trans-1010.c',
+  'trans-01011.c',
 ))
 
 target_arch += {
