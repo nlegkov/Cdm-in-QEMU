@@ -18,7 +18,7 @@ static void gen_logic_flags(TCGv_i32 result) {
     tcg_gen_andi_i32(n, n, 1);
 
     /* Очищаем только Z и N */
-    tcg_gen_andi_i32(ps, ps, 0xfff0);
+    tcg_gen_andi_i32(ps, ps, 0xfffc);
 
     /* Записываем новые флаги */
     tcg_gen_or_i32(ps, ps, z);

@@ -3,6 +3,40 @@
 #include "decode.h"
 #include "translate.h"
 
+static int decode_br_abs(CPUCdM16State *env, DisasContextBase *db,
+                         uint16_t insn) {
+    unsigned cond = insn & 0xf;
+
+    uint16_t target =
+        translator_lduw_end(env, db, (db->pc_next + 2) & 0xffff, MO_LE);
+
+    uint16_t next_pc = (db->pc_next + 4) & 0xffff;
+
+    cdm16_gen_branch(cond, target, next_pc, db->pc_next);
+
+    db->is_jmp = DISAS_NORETURN;
+    return 4;
+}
+
+static int decode_br_rel(DisasContextBase *db, uint16_t insn) {
+    /* cond: биты 12..9, imm9: биты 8..0. */
+    unsigned cond = (insn >> 9) & 0xf;
+    int32_t offset = insn & 0x1ff;
+
+    /* Префикс 110 задаёт отрицательное смещение. */
+    if ((insn >> 13) == 0b110) {
+        offset -= 512;
+    }
+
+    uint16_t next_pc = (db->pc_next + 2) & 0xffff;
+    uint16_t target = (next_pc + offset * 2) & 0xffff;
+
+    cdm16_gen_branch(cond, target, next_pc, db->pc_next);
+
+    db->is_jmp = DISAS_NORETURN;
+    return 2;
+}
+
 static int decode_00000(CPUCdM16State *env, DisasContextBase *db,
                         uint16_t insn) {
     /* Формат: 00000 0000000 op_type(4) */
@@ -54,7 +88,7 @@ static int decode_00000(CPUCdM16State *env, DisasContextBase *db,
         cdm16_gen_rti(db->pc_next);
         db->is_jmp = DISAS_NORETURN;
         return 2;
-        
+
     case 0b1010: /* pupc */
         cdm16_gen_pupc(db->pc_next);
         db->is_jmp = DISAS_NORETURN;
@@ -239,7 +273,7 @@ static int decode_01000(uint16_t insn) {
 
     switch (op_type) {
     case 0b00000: // MOV rs, rd
-        cdm16_gen_mov(rs, rd);
+        cdm16_gen_move(rs, rd);
         return 2;
 
     default:
@@ -326,7 +360,7 @@ static int decode_1011(uint16_t insn) {
     case 0b110: // SUB rs0, rs1, rd
         cdm16_gen_sub(rs0, rs1, rd);
         return 2;
-        
+
     case 0b111: // SUBC rs0, rs1, rd
         cdm16_gen_subc(rs0, rs1, rd);
         return 2;
@@ -360,11 +394,11 @@ static int decode_1010(uint16_t insn) {
         cdm16_gen_lcw_add(rs0, rs1, rd);
         return 2;
 
-    case 0b100: // LCB rs0, rs1, rd 
+    case 0b100: // LCB rs0, rs1, rd
         cdm16_gen_lcb_add(rs0, rs1, rd);
         return 2;
 
-    case 0b101: // LCSB rs0, rs1, rd    
+    case 0b101: // LCSB rs0, rs1, rd
         cdm16_gen_lcsb_add(rs0, rs1, rd);
         return 2;
 
@@ -429,6 +463,50 @@ static int decode_01011(uint16_t insn) {
     }
 }
 
+static int decode_100(CPUCdM16State *env, DisasContextBase *db, uint16_t insn) {
+    /* Формат: 100 op_type(4) imm9(9). */
+    unsigned op_type = (insn >> 9) & 0xf;
+    int32_t imm = insn & 0x1ff;
+
+    (void)env;
+    if (op_type == 3 || op_type == 5 || op_type == 7) {
+        imm -= 512;
+    }
+
+    switch (op_type) {
+    case 0: /* INT imm9 */
+        cdm16_gen_exception((unsigned)imm, (db->pc_next + 2) & 0xffff);
+        db->is_jmp = DISAS_NORETURN;
+        return 2;
+
+    case 1: /* RESET imm9 */
+        cdm16_gen_reset_imm9((uint16_t)imm, db->pc_next);
+        db->is_jmp = DISAS_NORETURN;
+        return 2;
+
+    case 2: /* PUSH: положительная форма */
+    case 3: /* PUSH: отрицательная форма */
+        cdm16_gen_push_imm9(imm, db->pc_next);
+        return 2;
+
+    case 4: /* ADDSP: положительная форма */
+    case 5: /* ADDSP: отрицательная форма */
+        cdm16_gen_addsp_imm9(imm, db->pc_next);
+        return 2;
+
+    case 6: /* JSR: положительная форма */
+    case 7: /* JSR: отрицательная форма */
+        cdm16_gen_jsr_imm9(imm, db->pc_next);
+        db->is_jmp = DISAS_NORETURN;
+        return 2;
+
+    default:
+        return 0;
+    }
+}
+
+
+
 static int decode_group_000(CPUCdM16State *env, DisasContextBase *db,
                             uint16_t insn) {
     switch (insn >> 12) {
@@ -438,7 +516,7 @@ static int decode_group_000(CPUCdM16State *env, DisasContextBase *db,
             return decode_00000(env, db, insn);
 
         case 0b00001:
-            return 0; // return decode_00001(env, db, insn);
+            return decode_br_abs(env, db, insn);
         }
         break;
 
@@ -457,7 +535,7 @@ static int decode_group_010(CPUCdM16State *env, DisasContextBase *db,
 
     case 0b01010:
         return decode_01010(insn); // return decode_01010(env, db, insn);
-    
+
     case 0b01011:
         return decode_01011(insn);
 
@@ -468,32 +546,14 @@ static int decode_group_010(CPUCdM16State *env, DisasContextBase *db,
     return 0;
 }
 
-static int decode_group_101(CPUCdM16State *env, DisasContextBase *db, uint16_t insn) {
+static int decode_group_101(CPUCdM16State *env, DisasContextBase *db,
+                            uint16_t insn) {
 
     switch (insn >> 12) {
-        case 0b1011:
-            return decode_1011(insn);
-        case 0b1010:
-            return decode_1010(insn);
-    }
-
-    return 0;
-}
-static int decode_100(CPUCdM16State *env, DisasContextBase *db, uint16_t insn) {
-    /* Формат: 100 op_type(4) imm9 */
-    unsigned op_type = (insn >> 9) & 0b1111;
-    unsigned imm = insn & 0x1FF;
-
-    switch (op_type) {
-    case 0b0000: /* INT imm9 */
-        cdm16_gen_exception(imm, (db->pc_next + 2) & 0xffff);
-
-        db->is_jmp = DISAS_NORETURN;
-        return 2;
-
-        if (op_type & 0b1) {
-            imm -= 512;
-        }
+    case 0b1011:
+        return decode_1011(insn);
+    case 0b1010:
+        return decode_1010(insn);
     }
 
     return 0;
@@ -524,7 +584,7 @@ int cdm16_decode_instruction(CPUCdM16State *env, DisasContextBase *db,
         return decode_group_101(env, db, insn); // Позже decode_group_101
     case 0b110:
     case 0b111:
-        return 0; // Позже decode_branch
+        return decode_br_rel(db, insn);
     }
 
     return 0;

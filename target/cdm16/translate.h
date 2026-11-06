@@ -58,7 +58,7 @@ void cdm16_gen_addsp(unsigned rd, uint32_t fault_pc);
 
 
 /* Группа 01000 */
-void cdm16_gen_mov(unsigned rs, unsigned rd);
+void cdm16_gen_move(unsigned rs, unsigned rd);
 
 /* Группа 01010 */
 void cdm16_gen_ldw(unsigned rs, unsigned rd);
@@ -72,6 +72,11 @@ void cdm16_gen_stb(unsigned rs, unsigned rd);
 
 /* Группа 100*/
 void cdm16_gen_int_imm9(uint16_t vector, uint32_t insn_pc);
+void cdm16_gen_reset_imm9(uint16_t vector, uint32_t insn_pc);
+void cdm16_gen_push_imm9(int32_t imm, uint32_t insn_pc);
+void cdm16_gen_addsp_imm9(int32_t imm, uint32_t insn_pc);
+void cdm16_gen_jsr_imm9(int32_t imm, uint32_t insn_pc);
+
 /* Группа 1011 */
 void cdm16_gen_and(unsigned rs0, unsigned rs1, unsigned rd);
 void cdm16_gen_or(unsigned rs0, unsigned rs1, unsigned rd);
