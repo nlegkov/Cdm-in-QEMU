@@ -10,6 +10,23 @@ TCGv_i32 cdm16_tcg_sp(void);
 TCGv_i32 cdm16_tcg_pc(void);
 TCGv_i32 cdm16_tcg_ps(void);
 
+/*
+ * Flag inputs a, b, src and result are 16-bit values. wide retains bit 16.
+ * carry is the incoming carry (0 or 1), captured before updating PS.
+ * Arithmetic V follows the reference emulator's effective second operand.
+ */
+void cdm16_gen_flags_add(TCGv_i32 a, TCGv_i32 b, TCGv_i32 carry,
+                         TCGv_i32 wide, TCGv_i32 result);
+void cdm16_gen_flags_sub(TCGv_i32 a, TCGv_i32 b, TCGv_i32 carry,
+                         TCGv_i32 wide, TCGv_i32 result);
+void cdm16_gen_flags_neg(TCGv_i32 src, TCGv_i32 result);
+/* Update Z/N only, preserving C/V. */
+void cdm16_gen_flags_zn(TCGv_i32 result);
+/* Update C/V/Z/N, clearing C/V. */
+void cdm16_gen_flags_logic(TCGv_i32 result);
+/* Update C/V/Z/N, taking C from carry and clearing V. */
+void cdm16_gen_flags_shift(TCGv_i32 result, TCGv_i32 carry);
+
 void cdm16_gen_exception(unsigned exception, uint32_t pc);
 void cdm16_gen_halt(uint16_t next_pc);
 void cdm16_gen_wait(uint16_t next_pc);

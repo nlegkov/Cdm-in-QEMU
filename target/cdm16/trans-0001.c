@@ -4,25 +4,6 @@
 #include "translate.h"
 #include "cpu.h"
 
-static void gen_shift_flags(TCGv_i32 result, TCGv_i32 carry) {
-    TCGv_i32 z = tcg_temp_new_i32();
-    TCGv_i32 n = tcg_temp_new_i32();
-    TCGv_i32 c = tcg_temp_new_i32();
-    TCGv_i32 ps = cdm16_tcg_ps();
-
-    /* C: последний вытесненный бит; Z,N: 16-битный результат. */
-    tcg_gen_shli_i32(c, carry, 3);
-    tcg_gen_setcondi_i32(TCG_COND_EQ, z, result, 0);
-    tcg_gen_shli_i32(z, z, 1);
-    tcg_gen_shri_i32(n, result, 15);
-
-    /* Обновляем C,Z,N и сбрасываем V, как в эталонном эмуляторе. */
-    tcg_gen_andi_i32(ps, ps, 0xfff0);
-    tcg_gen_or_i32(ps, ps, c);
-    tcg_gen_or_i32(ps, ps, z);
-    tcg_gen_or_i32(ps, ps, n);
-}
-
 void cdm16_gen_shl(unsigned rs, unsigned rd, int32_t shift_val) {
     TCGv_i32 src = tcg_temp_new_i32();
     TCGv_i32 result = tcg_temp_new_i32();
@@ -38,7 +19,7 @@ void cdm16_gen_shl(unsigned rs, unsigned rd, int32_t shift_val) {
     tcg_gen_shli_i32(result, src, shift_val);
     tcg_gen_andi_i32(result, result, 0xffff);
 
-    gen_shift_flags(result, carry);
+    cdm16_gen_flags_shift(result, carry);
     tcg_gen_mov_i32(cdm16_tcg_reg(rd), result);
 }
 
@@ -57,7 +38,7 @@ void cdm16_gen_shr(unsigned rs, unsigned rd, int32_t shift_val) {
     tcg_gen_shri_i32(result, src, shift_val);
     tcg_gen_andi_i32(result, result, 0xffff);
 
-    gen_shift_flags(result, carry);
+    cdm16_gen_flags_shift(result, carry);
     tcg_gen_mov_i32(cdm16_tcg_reg(rd), result);
 }
 
@@ -77,7 +58,7 @@ void cdm16_gen_shra(unsigned rs, unsigned rd, int32_t shift_val) {
     tcg_gen_sari_i32(result, result, shift_val);
     tcg_gen_andi_i32(result, result, 0xffff);
 
-    gen_shift_flags(result, carry);
+    cdm16_gen_flags_shift(result, carry);
     tcg_gen_mov_i32(cdm16_tcg_reg(rd), result);
 }
 
@@ -100,7 +81,7 @@ void cdm16_gen_rol(unsigned rs, unsigned rd, int32_t shift_val) {
     tcg_gen_or_i32(result, result, tmp);
     tcg_gen_andi_i32(result, result, 0xffff);
 
-    gen_shift_flags(result, carry);
+    cdm16_gen_flags_shift(result, carry);
     tcg_gen_mov_i32(cdm16_tcg_reg(rd), result);
 }
 
@@ -123,7 +104,7 @@ void cdm16_gen_ror(unsigned rs, unsigned rd, int32_t shift_val) {
     tcg_gen_or_i32(result, result, tmp);
     tcg_gen_andi_i32(result, result, 0xffff);
 
-    gen_shift_flags(result, carry);
+    cdm16_gen_flags_shift(result, carry);
     tcg_gen_mov_i32(cdm16_tcg_reg(rd), result);
 }
 
@@ -150,7 +131,7 @@ void cdm16_gen_rcl(unsigned rs, unsigned rd, int32_t shift_val) {
     tcg_gen_or_i32(result, result, tmp);
     tcg_gen_andi_i32(result, result, 0xffff);
 
-    gen_shift_flags(result, carry);
+    cdm16_gen_flags_shift(result, carry);
     tcg_gen_mov_i32(cdm16_tcg_reg(rd), result);
 }
 
@@ -177,6 +158,6 @@ void cdm16_gen_rcr(unsigned rs, unsigned rd, int32_t shift_val) {
     tcg_gen_or_i32(result, result, tmp);
     tcg_gen_andi_i32(result, result, 0xffff);
 
-    gen_shift_flags(result, carry);
+    cdm16_gen_flags_shift(result, carry);
     tcg_gen_mov_i32(cdm16_tcg_reg(rd), result);
 }

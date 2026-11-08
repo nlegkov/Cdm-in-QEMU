@@ -68,50 +68,6 @@ void cdm16_gen_ldi_short(unsigned rd, int32_t imm) {
     tcg_gen_movi_i32(cdm16_tcg_reg(rd), (uint16_t)imm);
 }
 
-/* Обновление флагов C, V, Z, N после сложения */
-static void gen_add_flags(TCGv_i32 a, uint16_t b, TCGv_i32 sum,
-                          TCGv_i32 result) {
-    TCGv_i32 c = tcg_temp_new_i32();
-    TCGv_i32 v = tcg_temp_new_i32();
-    TCGv_i32 z = tcg_temp_new_i32();
-    TCGv_i32 n = tcg_temp_new_i32();
-    TCGv_i32 tmp = tcg_temp_new_i32();
-    TCGv_i32 flags = tcg_temp_new_i32();
-
-    /* C: перенос из 16-го бита */
-    tcg_gen_shri_i32(c, sum, 16);
-
-    /* V: знаковое переполнение */
-    tcg_gen_xori_i32(tmp, a, b);
-    tcg_gen_not_i32(tmp, tmp);
-
-    tcg_gen_xor_i32(v, a, result);
-    tcg_gen_and_i32(v, v, tmp);
-    tcg_gen_shri_i32(v, v, 15);
-    tcg_gen_andi_i32(v, v, 1);
-
-    /* Z: результат равен нулю */
-    tcg_gen_setcondi_i32(TCG_COND_EQ, z, result, 0);
-
-    /* N: знак результата */
-    tcg_gen_shri_i32(n, result, 15);
-
-    /* Собираем флаги: C V Z N */
-    tcg_gen_shli_i32(c, c, 3);
-    tcg_gen_shli_i32(v, v, 2);
-    tcg_gen_shli_i32(z, z, 1);
-
-    tcg_gen_or_i32(flags, c, v);
-    tcg_gen_or_i32(flags, flags, z);
-    tcg_gen_or_i32(flags, flags, n);
-
-    /* Обновляем только младшие 4 бита PS */
-    TCGv_i32 ps = cdm16_tcg_ps();
-
-    tcg_gen_andi_i32(ps, ps, 0xfff0);
-    tcg_gen_or_i32(ps, ps, flags);
-}
-
 /* ADD rd, imm6 */
 void cdm16_gen_add_imm(unsigned rd, int32_t imm) {
     TCGv_i32 reg = cdm16_tcg_reg(rd);
@@ -132,66 +88,26 @@ void cdm16_gen_add_imm(unsigned rd, int32_t imm) {
     tcg_gen_andi_i32(result, sum, 0xffff);
 
     /* Обновляем флаги */
-    gen_add_flags(a, b, sum, result);
+    cdm16_gen_flags_add(a, tcg_constant_i32(b),
+                        tcg_constant_i32(0), sum, result);
 
     /* Записываем результат в rd */
     tcg_gen_mov_i32(reg, result);
 }
 
-static void gen_sub_flags(TCGv_i32 a, uint16_t b, TCGv_i32 result) {
-    TCGv_i32 c = tcg_temp_new_i32();
-    TCGv_i32 v = tcg_temp_new_i32();
-    TCGv_i32 z = tcg_temp_new_i32();
-    TCGv_i32 n = tcg_temp_new_i32();
-    TCGv_i32 tmp = tcg_temp_new_i32();
-    TCGv_i32 flags = tcg_temp_new_i32();
-
-    /* C: вычитание без займа */
-    tcg_gen_setcondi_i32(TCG_COND_GEU, c, a, b);
-
-    /* V: знаковое переполнение */
-    tcg_gen_xori_i32(tmp, a, b);
-    tcg_gen_xor_i32(v, a, result);
-    tcg_gen_and_i32(v, v, tmp);
-    tcg_gen_shri_i32(v, v, 15);
-    tcg_gen_andi_i32(v, v, 1);
-
-    /* Z: результат равен нулю */
-    tcg_gen_setcondi_i32(TCG_COND_EQ, z, result, 0);
-
-    /* N: знак результата */
-    tcg_gen_shri_i32(n, result, 15);
-
-    /* Собираем CVZN */
-    tcg_gen_shli_i32(c, c, 3);
-    tcg_gen_shli_i32(v, v, 2);
-    tcg_gen_shli_i32(z, z, 1);
-
-    tcg_gen_or_i32(flags, c, v);
-    tcg_gen_or_i32(flags, flags, z);
-    tcg_gen_or_i32(flags, flags, n);
-
-    /* Обновляем младшие четыре бита PS */
-    TCGv_i32 ps = cdm16_tcg_ps();
-
-    tcg_gen_andi_i32(ps, ps, 0xfff0);
-    tcg_gen_or_i32(ps, ps, flags);
-}
-
-void cdm16_gen_cmp_imm(unsigned rd, int32_t imm) {
+void cdm16_gen_cmp_imm(unsigned rd, int32_t imm)
+{
     TCGv_i32 a = tcg_temp_new_i32();
+    TCGv_i32 wide = tcg_temp_new_i32();
     TCGv_i32 result = tcg_temp_new_i32();
-
     uint16_t b = (uint16_t)imm;
 
-    /* Получаем значение регистра */
     tcg_gen_andi_i32(a, cdm16_tcg_reg(rd), 0xffff);
-    /* result = a - b */
-    tcg_gen_subi_i32(result, a, b);
 
-    /* Ограничиваем результат 16 битами */
-    tcg_gen_andi_i32(result, result, 0xffff);
+    /* Preserve the carry-out, using the same subtraction as register CMP. */
+    tcg_gen_addi_i32(wide, a, ((uint32_t)b ^ 0xffffu) + 1);
+    tcg_gen_andi_i32(result, wide, 0xffff);
 
-    /* Вычисляем флаги */
-    gen_sub_flags(a, b, result);
+    cdm16_gen_flags_sub(a, tcg_constant_i32(b),
+                        tcg_constant_i32(1), wide, result);
 }
