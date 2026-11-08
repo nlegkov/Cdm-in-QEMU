@@ -3,6 +3,7 @@ cdm16_ss = ss.source_set()
 cdm16_ss.add(files(
   'cpu.c',
   'translate.c',
+  'trans-flags.c',
   'decode.c',
   'helper.c',
   'trans-00000.c',
