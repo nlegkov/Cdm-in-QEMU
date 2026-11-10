@@ -96,7 +96,7 @@ static void cdm16_tr_init_disas_context(DisasContextBase *db, CPUState *cs) {
      * Пока настоящего декодера нет:
      * один Translation Block = одна условная инструкция.
      */
-    db->max_insns = 1;
+    db->max_insns = MIN(db->max_insns, 32);
 }
 
 // Начало Translation Block
@@ -133,10 +133,6 @@ static void cdm16_tr_translate_insn(DisasContextBase *db, CPUState *cs) {
     }
 
     db->pc_next = (db->pc_next + size) & 0xffff;
-
-    if (db->is_jmp == DISAS_NEXT) {
-        db->is_jmp = DISAS_TOO_MANY;
-    }
 }
 
 // завершение Translation Block
