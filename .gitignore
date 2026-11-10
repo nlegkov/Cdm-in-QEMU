@@ -5,6 +5,7 @@
 /build-test/
 /.cache/
 /.vscode/
+/.zed/
 *.pyc
 .sdk
 .stgit-*
@@ -23,3 +24,4 @@ GTAGS
 *.swp
 *.patch
 *.gcov
+*.clangd
