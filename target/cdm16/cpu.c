@@ -295,12 +295,36 @@ static bool cdm16_cpu_tlb_fill(CPUState *cs, vaddr addr, int size,
     return true;
 }
 
+static bool cdm16_cpu_translate_for_debug(CPUState *cs, vaddr addr,
+                                         TranslateForDebugResult *result) {
+    CDM16CPU *cpu = CDM16_CPU(cs);
+
+    /* Debug memory accesses use the data address space. */
+    result->physaddr = (addr & 0xffff) + (cpu->harvard ? 0x10000 : 0);
+    result->attrs = MEMTXATTRS_UNSPECIFIED;
+    result->attrs.debug = 1;
+    result->lg_page_size = TARGET_PAGE_BITS;
+
+    return true;
+}
+
 // CPUClass -> sysemu_ops -> cdm16_sysemu_ops -> cdm16_cpu_has_work
 static const SysemuCPUOps cdm16_sysemu_ops = {
     .has_work = cdm16_cpu_has_work,
+    .translate_for_debug = cdm16_cpu_translate_for_debug,
 };
 
 // Все CdM-16 CPU используют один и тот же набор функций TCG.
+static void cdm16_restore_state_to_opc(CPUState *cs,
+                                      const TranslationBlock *tb,
+                                      const uint64_t *data) {
+    /* При перекомпиляции из-за обращения к MMIO выполнение возобновляется
+    с инструкции, вызвавшей это обращение */
+    CPUCdM16State *env = cpu_env(cs);
+
+    env->pc = data[0] & 0xffff;
+}
+
 static const TCGCPUOps cdm16_tcg_ops = {
     .guest_default_memory_order = TCG_MO_ALL,
     .mttcg_supported = false,
@@ -308,6 +332,7 @@ static const TCGCPUOps cdm16_tcg_ops = {
     .initialize = cdm16_translate_init,
     .translate_code = cdm16_translate_code,
     .get_tb_cpu_state = cdm16_get_tb_cpu_state,
+    .restore_state_to_opc = cdm16_restore_state_to_opc,
 
     .mmu_index = cdm16_cpu_mmu_index,
     .tlb_fill = cdm16_cpu_tlb_fill,

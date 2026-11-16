@@ -1,0 +1,60 @@
+name: CdM-16 CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: CdM-16 build and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential ninja-build pkg-config python3-venv \
+            libglib2.0-dev libpixman-1-dev libfdt-dev zlib1g-dev
+
+      - name: Configure CdM-16
+        run: |
+          mkdir build
+          cd build
+          ../configure --target-list=cdm16-softmmu \
+            --disable-docs --disable-werror --disable-rust
+
+      - name: Build
+        run: make -C build -j2
+
+      - name: Run unit tests
+        run: make -C build -j2 check-unit
+
+      - name: Run QEMU integration tests
+        run: make -C build -j2 check-qtest
+
+      - name: Print failure details
+        if: failure()
+        run: |
+          for log in build/config.log build/meson-logs/meson-log.txt build/meson-logs/testlog.txt; do
+            if [ -f "$log" ]; then
+              echo "::group::$log"
+              tail -n 200 "$log"
+              echo "::endgroup::"
+            fi
+          done

@@ -37,6 +37,9 @@ qtests_generic += [
   'readconfig-test',
   'netdev-socket',
 ]
+
+qtests_cdm16 = ['cdm16-test']
+
 if enable_modules
   qtests_generic += [ 'modules-test' ]
 endif
