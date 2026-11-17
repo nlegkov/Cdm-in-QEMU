@@ -97,6 +97,7 @@ static void cdm16_machine_init(MachineState *machine) {
     uart = qdev_new(TYPE_CDM_UART);
     qdev_prop_set_chr(uart, "chardev", serial_hd(0));
     sysbus_realize_and_unref(SYS_BUS_DEVICE(uart), &error_fatal);
+    
     /* MMIO takes precedence over RAM at these two byte addresses. */
     memory_region_add_subregion_overlap(sysmem, data_base + s->uart_flags_addr,
         sysbus_mmio_get_region(SYS_BUS_DEVICE(uart), 0), 1);

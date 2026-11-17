@@ -1,14 +1,14 @@
 #include "qemu/osdep.h"
 
-#include "cpu.h"
-#include "exec/translation-block.h"
-#include "exec/translator.h"
 #include "exec/helper-proto.h"
 #include "exec/helper-gen.h"
+#include "exec/translation-block.h"
+#include "exec/translator.h"
 #include "tcg/tcg-op.h"
 
-#include "translate.h"
+#include "cpu.h"
 #include "decode.h"
+#include "translate.h"
 
 #define HELPER_H "helper.h"
 #include "exec/helper-info.c.inc"
@@ -22,7 +22,6 @@ static TCGv_i32 cpu_regs[CDM16_NUM_REGS];
 static TCGv_i32 cpu_sp;
 static TCGv_i32 cpu_pc;
 static TCGv_i32 cpu_ps;
-
 
 // Генерация кода для записи значения в регистр (PC или SP) с проверкой на
 // выравнивание
@@ -116,6 +115,8 @@ static void cdm16_tr_translate_insn(DisasContextBase *db, CPUState *cs) {
     if (pc & 1) {
         cdm16_gen_exception(CDM16_EXCP_UNALIGNED_PC, pc);
 
+        /* Keep the exception TB nonempty; the guest PC stays at the fault. */
+        db->pc_next += 2;
         db->is_jmp = DISAS_NORETURN;
         return;
     }
@@ -188,8 +189,7 @@ void cdm16_gen_halt(uint16_t next_pc) {
     gen_helper_halt(tcg_env);
 }
 
-void cdm16_gen_wait(uint16_t next_pc)
-{
+void cdm16_gen_wait(uint16_t next_pc) {
     tcg_gen_movi_i32(cpu_pc, next_pc);
     gen_helper_cdm16_wait(tcg_env);
 }
