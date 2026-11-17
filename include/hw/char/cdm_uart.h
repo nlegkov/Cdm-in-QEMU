@@ -3,7 +3,7 @@
 
 #include "qom/object.h"
 
-#define TYPE_CDM_UART "cdm_ uart"
+#define TYPE_CDM_UART "cdm_uart"
 OBJECT_DECLARE_SIMPLE_TYPE(CdmUartState, CDM_UART)
 
 #endif
