@@ -5,6 +5,7 @@
 #include "cpu.h"
 #include "qapi/error.h"
 
+#include "qemu/log.h"
 #include "qemu/qemu-print.h"
 
 #include "accel/tcg/cpu-ops.h"
@@ -193,6 +194,17 @@ static void cdm16_cpu_dump_state(CPUState *cs, FILE *f, int flags) {
                  (unsigned)env->regs[6], (unsigned)env->regs[7]);
 }
 
+static void cdm16_cpu_set_irq_vector(void *opaque, int bit, int level) {
+    CDM16CPU *cpu = opaque;
+    uint16_t mask = 1u << bit;
+
+    if (level) {
+        cpu->env.irq_vector |= mask;
+    } else {
+        cpu->env.irq_vector &= ~mask;
+    }
+}
+
 static void cdm16_cpu_set_irq(void *opaque, int irq, int level) {
     CDM16CPU *cpu = opaque;
     CPUState *cs = CPU(cpu);
@@ -200,13 +212,28 @@ static void cdm16_cpu_set_irq(void *opaque, int irq, int level) {
     (void)irq;
 
     if (level) {
+        /* An asserted request keeps its vector until IRQ is lowered. */
+        if (cpu_test_interrupt(cs, CPU_INTERRUPT_HARD)) {
+            return;
+        }
+        if (cpu->env.irq_vector < CDM16_IRQ_VECTOR_MIN ||
+            cpu->env.irq_vector > CDM16_IRQ_VECTOR_MAX) {
+            qemu_log_mask(LOG_GUEST_ERROR,
+                          "CDM16: invalid external IRQ vector 0x%04x\n",
+                          (unsigned)cpu->env.irq_vector);
+            return;
+        }
+        cpu->env.pending_vector = cpu->env.irq_vector;
         cpu_interrupt(cs, CPU_INTERRUPT_HARD);
     } else {
         cpu_reset_interrupt(cs, CPU_INTERRUPT_HARD);
+        cpu->env.pending_vector = 0;
     }
 }
 
 static void cdm16_cpu_initfn(Object *obj) {
+    qdev_init_gpio_in_named(DEVICE(obj), cdm16_cpu_set_irq_vector, "irq-vector",
+                            CDM16_IRQ_VECTOR_BITS);
     qdev_init_gpio_in(DEVICE(obj), cdm16_cpu_set_irq, 1);
 }
 
@@ -248,7 +275,7 @@ static bool cdm16_cpu_exec_interrupt(CPUState *cs, int interrupt_request) {
      * env->pc уже содержит адрес продолжения.
      * Для внешнего IRQ прибавлять 2 не нужно.
      */
-    cs->exception_index = CDM16_IRQ_VECTOR;
+    cs->exception_index = env->pending_vector;
     cdm16_cpu_do_interrupt(cs);
 
     /*
