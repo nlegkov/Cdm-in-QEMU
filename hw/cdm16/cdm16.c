@@ -108,8 +108,8 @@ static void cdm16_machine_init(MachineState *machine) {
 static void cdm16_machine_instance_init(Object *obj) {
     CDM16MachineState *s = CDM16_MACHINE(obj);
 
-    s->uart_flags_addr = 0xff00;
-    s->uart_data_addr = 0xff01;
+    s->uart_flags_addr = 0xf000;
+    s->uart_data_addr = 0xf001;
     object_property_add_uint64_ptr(obj, "uart-flags-addr", &s->uart_flags_addr,
                                    OBJ_PROP_FLAG_READWRITE);
     object_property_add_uint64_ptr(obj, "uart-data-addr", &s->uart_data_addr,
