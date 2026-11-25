@@ -24,7 +24,10 @@
 #define CDM16_EXCP_INT 0x1000
 #define CDM16_EXCP_IRQ 0x1001
 
-#define CDM16_IRQ_VECTOR 5
+/* Four bytes per vector in the 64 KiB code address space. */
+#define CDM16_IRQ_VECTOR_BITS 16
+#define CDM16_IRQ_VECTOR_MIN 5
+#define CDM16_IRQ_VECTOR_MAX 0x3fff
 
 typedef enum {
     CDM16_EXCP_UNALIGNED_SP = 1,
@@ -41,7 +44,8 @@ typedef struct CPUArchState {
     uint32_t pc;
     uint32_t ps;
 
-    uint16_t pending_vector;
+    uint16_t irq_vector;       /* External irq-vector GPIO bus. */
+    uint16_t pending_vector;   /* Latched when IRQ is asserted. */
 } CPUCdM16State;
 
 
