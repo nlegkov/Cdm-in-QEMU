@@ -57,7 +57,6 @@ enum {
 
     NM_POOL32S      = 0x30,
     NM_P_BRI        = 0x32,
-    NM_LI16         = 0x34,
     NM_SWGP16       = 0x35,
     NM_P16_BR       = 0x36,
 
@@ -86,7 +85,6 @@ enum {
 
 /* P48I instruction pool */
 enum {
-    NM_LI48        = 0x00,
     NM_ADDIU48     = 0x01,
     NM_ADDIUGP48   = 0x02,
     NM_ADDIUPC48   = 0x03,
@@ -399,7 +397,6 @@ enum {
 /* POOL32A7 instruction pool */
 enum {
     NM_P_LSX        = 0x00,
-    NM_LSA          = 0x01,
     NM_EXTW         = 0x03,
     NM_POOL32AXF    = 0x07,
 };
@@ -2561,11 +2558,11 @@ static void gen_compute_branch_cp1_nm(DisasContext *ctx, uint32_t op,
     btarget = addr_add(ctx, ctx->base.pc_next + 4, offset);
 
     switch (op) {
-    case NM_BC1EQZC:
+    case OPC_BC1EQZ:
         tcg_gen_xori_i64(t0, t0, 1);
         ctx->hflags |= MIPS_HFLAG_BC;
         break;
-    case NM_BC1NEZC:
+    case OPC_BC1NEZ:
         /* t0 already set */
         ctx->hflags |= MIPS_HFLAG_BC;
         break;
@@ -3576,7 +3573,7 @@ static int decode_nanomips_32_48_opc(CPUMIPSState *env, DisasContext *ctx)
                 }
                 break;
             case NM_BREAK:
-                generate_exception_end(ctx, EXCP_BREAK);
+                generate_exception_break(ctx, extract32(ctx->opcode, 0, 19));
                 break;
             case NM_SDBBP:
                 if (is_uhi(ctx, extract32(ctx->opcode, 0, 19))) {
@@ -3625,9 +3622,6 @@ static int decode_nanomips_32_48_opc(CPUMIPSState *env, DisasContext *ctx)
             case NM_P_LSX:
                 gen_p_lsx(ctx, rd, rs, rt);
                 break;
-            case NM_LSA:
-                gen_lsa(ctx, rd, rt, rs, extract32(ctx->opcode, 9, 2));
-                break;
             case NM_EXTW:
                 gen_ext(ctx, 32, rd, rs, rt, extract32(ctx->opcode, 6, 5));
                 break;
@@ -3669,12 +3663,6 @@ static int decode_nanomips_32_48_opc(CPUMIPSState *env, DisasContext *ctx)
                                        mo_endian(ctx));
             target_long addr_off = extract32(ctx->opcode, 0, 16) | insn << 16;
             switch (extract32(ctx->opcode, 16, 5)) {
-            case NM_LI48:
-                check_nms(ctx);
-                if (rt != 0) {
-                    tcg_gen_movi_tl(cpu_gpr[rt], addr_off);
-                }
-                break;
             case NM_ADDIU48:
                 check_nms(ctx);
                 if (rt != 0) {
@@ -3757,7 +3745,7 @@ static int decode_nanomips_32_48_opc(CPUMIPSState *env, DisasContext *ctx)
                                 extract32(ctx->opcode, 2, 1),
                                 extract32(ctx->opcode, 3, 9) << 3);
                     if ((ctx->opcode & 3) == NM_RESTORE_JRC) {
-                        gen_compute_branch_nm(ctx, OPC_JR, 2, 31, 0, 0);
+                        gen_compute_branch_nm(ctx, OPC_JR, 4, 31, 0, 0);
                     }
                     break;
                 default:
@@ -4376,13 +4364,7 @@ static int decode_nanomips_32_48_opc(CPUMIPSState *env, DisasContext *ctx)
                     break;
                 case NM_BPOSGE32C:
                     check_dsp_r3(ctx);
-                    {
-                        imm = extract32(ctx->opcode, 1, 13)
-                            | extract32(ctx->opcode, 0, 1) << 13;
-
-                        gen_compute_branch_nm(ctx, OPC_BPOSGE32, 4, -1, -2,
-                                              imm << 1);
-                    }
+                    gen_compute_branch_nm(ctx, OPC_BPOSGE32, 4, -1, -2, s);
                     break;
                 default:
                     gen_reserved_instruction(ctx);
@@ -4448,10 +4430,12 @@ static int decode_nanomips_32_48_opc(CPUMIPSState *env, DisasContext *ctx)
         {
             int32_t s = sextract32(ctx->opcode, 0, 1) << 11 |
                         extract32(ctx->opcode, 1, 10) << 1;
-            uint32_t u = extract32(ctx->opcode, 11, 7);
+            uint32_t opc = extract32(ctx->opcode, 18, 3);
+            uint32_t u = extract32(ctx->opcode, 11,
+                                   (opc == NM_BBEQZC ||
+                                    opc == NM_BBNEZC) ? 6 : 7);
 
-            gen_compute_imm_branch(ctx, extract32(ctx->opcode, 18, 3),
-                                   rt, u, s);
+            gen_compute_imm_branch(ctx, opc, rt, u, s);
         }
         break;
     default:
@@ -4463,10 +4447,11 @@ static int decode_nanomips_32_48_opc(CPUMIPSState *env, DisasContext *ctx)
 
 static int decode_isa_nanomips(CPUMIPSState *env, DisasContext *ctx)
 {
+    uint64_t opcode;
     uint32_t op;
-    int rt = decode_gpr_gpr3(NANOMIPS_EXTRACT_RT3(ctx->opcode));
-    int rs = decode_gpr_gpr3(NANOMIPS_EXTRACT_RS3(ctx->opcode));
-    int rd = decode_gpr_gpr3(NANOMIPS_EXTRACT_RD3(ctx->opcode));
+    int rt;
+    int rs;
+    int rd;
     int offset;
     int imm;
 
@@ -4478,6 +4463,34 @@ static int decode_isa_nanomips(CPUMIPSState *env, DisasContext *ctx)
         return 2;
     }
 
+    opcode = translator_lduw_end(env, &ctx->base, ctx->base.pc_next,
+                                 mo_endian(ctx));
+    ctx->opcode = opcode;
+    if (extract32(opcode, 12, 1)) {
+        /* Major opcodes with bit 2 set are 16-bit */
+        if (decode_isa_nanomips16(ctx, opcode)) {
+            return 2;
+        }
+    } else {
+        opcode <<= 16;
+        opcode |= translator_lduw_end(env, &ctx->base, ctx->base.pc_next + 2,
+                                      mo_endian(ctx));
+        if (extract32(opcode, 26, 6) == NM_P48I) {
+            opcode <<= 16;
+            opcode |= translator_lduw_end(env, &ctx->base,
+                                          ctx->base.pc_next + 4,
+                                          mo_endian(ctx));
+            if (decode_isa_nanomips48(ctx, opcode)) {
+                return 6;
+            }
+        } else if (decode_isa_nanomips32(ctx, opcode)) {
+            return 4;
+        }
+    }
+
+    rt = decode_gpr_gpr3(NANOMIPS_EXTRACT_RT3(ctx->opcode));
+    rs = decode_gpr_gpr3(NANOMIPS_EXTRACT_RS3(ctx->opcode));
+    rd = decode_gpr_gpr3(NANOMIPS_EXTRACT_RD3(ctx->opcode));
     op = extract32(ctx->opcode, 10, 6);
     switch (op) {
     case NM_P16_MV:
@@ -4497,7 +4510,7 @@ static int decode_isa_nanomips(CPUMIPSState *env, DisasContext *ctx)
                 }
                 break;
             case NM_BREAK16:
-                generate_exception_end(ctx, EXCP_BREAK);
+                generate_exception_break(ctx, extract32(ctx->opcode, 0, 3));
                 break;
             case NM_SDBBP16:
                 if (is_uhi(ctx, extract32(ctx->opcode, 0, 3))) {
@@ -4601,15 +4614,6 @@ static int decode_isa_nanomips(CPUMIPSState *env, DisasContext *ctx)
         default:
             gen_reserved_instruction(ctx);
             break;
-        }
-        break;
-    case NM_LI16:
-        {
-            imm = extract32(ctx->opcode, 0, 7);
-            imm = (imm == 0x7f ? -1 : imm);
-            if (rt != 0) {
-                tcg_gen_movi_tl(cpu_gpr[rt], imm);
-            }
         }
         break;
     case NM_ANDI16:

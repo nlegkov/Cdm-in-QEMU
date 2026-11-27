@@ -343,7 +343,6 @@ static const TCGCPUOps cdm16_tcg_ops = {
     .do_interrupt = cdm16_cpu_do_interrupt,
 
     .cpu_exec_interrupt = cdm16_cpu_exec_interrupt,
-    .cpu_exec_halt = cdm16_cpu_has_work,
     .cpu_exec_reset = cpu_reset,
 };
 

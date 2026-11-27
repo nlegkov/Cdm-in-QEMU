@@ -85,6 +85,8 @@ static void verify_state(AHCIQState *ahci, uint64_t hba_old)
     uint64_t hba_base;
     AHCICommandHeader cmd;
 
+    g_assert_cmphex(ahci->hba_bar.addr, ==, hba_old);
+
     ahci_fingerprint = qpci_config_readl(ahci->dev, PCI_VENDOR_ID);
     g_assert_cmphex(ahci_fingerprint, ==, ahci->fingerprint);
 
@@ -135,6 +137,7 @@ static void ahci_migrate(AHCIQState *from, AHCIQState *to, const char *uri)
     memcpy(to, from, sizeof(AHCIQState));
     to->parent = tmp;
     to->dev = dev;
+    qpci_migrate_fixup(to->dev, from->dev);
 
     tmp = from->parent;
     dev = from->dev;
@@ -198,6 +201,7 @@ static void ahci_shutdown(AHCIQState *ahci)
 {
     QOSState *qs = ahci->parent;
 
+    ahci_pci_disable(ahci);
     ahci_clean_mem(ahci);
     free_ahci_device(ahci->dev);
     g_free(ahci);
@@ -1457,7 +1461,9 @@ static void test_reset(void)
                                CMD_READ_DMA_EXT,
                                CMD_WRITE_DMA_EXT);
         ahci_set(ahci, AHCI_GHC, AHCI_GHC_HR);
+        stop_ahci_device(ahci);
         ahci_clean_mem(ahci);
+        start_ahci_device(ahci);
     }
 
     ahci_shutdown(ahci);
@@ -1523,6 +1529,7 @@ static void test_reset_pending_callback(void)
     sleep(1);
 
     /* Start again. */
+    stop_ahci_device(ahci);
     ahci_clean_mem(ahci);
     ahci_pci_enable(ahci);
     ahci_hba_enable(ahci);
@@ -1728,6 +1735,40 @@ static void test_cdrom_dma_raw(void)
 static void test_cdrom_pio_raw(void)
 {
     ahci_test_cdrom_raw(3, false);
+}
+
+/* Regression test: read the last sector of a medium over 4 TiB. */
+static void ahci_test_cdrom_high_lba(bool dma)
+{
+    AHCIQState *ahci;
+    g_autofree unsigned char *tx = g_malloc0(ATAPI_SECTOR_SIZE);
+    uint64_t lba = (uint64_t)INT32_MAX + 1;
+    AHCIOpts opts = {
+        .size = ATAPI_SECTOR_SIZE,
+        .lba = lba,
+        .atapi = true,
+        .atapi_dma = dma,
+        .post_cb = ahci_cb_cmp_buff,
+        .opaque = tx,
+    };
+
+    ahci = ahci_boot_and_enable("-blockdev driver=null-co,node-name=cd0,"
+                                "read-only=on,read-zeroes=on,size=%" PRIu64 " "
+                                "-M q35 "
+                                "-device ide-cd,drive=cd0 ",
+                                (lba + 1) * ATAPI_SECTOR_SIZE);
+    ahci_exec(ahci, ahci_port_select(ahci), CMD_ATAPI_READ_10, &opts);
+    ahci_shutdown(ahci);
+}
+
+static void test_cdrom_dma_high_lba(void)
+{
+    ahci_test_cdrom_high_lba(true);
+}
+
+static void test_cdrom_pio_high_lba(void)
+{
+    ahci_test_cdrom_high_lba(false);
 }
 
 /*
@@ -2420,6 +2461,8 @@ int main(int argc, char **argv)
     qtest_add_func("/ahci/cdrom/pio/single", test_cdrom_pio);
     qtest_add_func("/ahci/cdrom/pio/multi", test_cdrom_pio_multi);
     qtest_add_func("/ahci/cdrom/pio/raw", test_cdrom_pio_raw);
+    qtest_add_func("/ahci/cdrom/dma/high_lba", test_cdrom_dma_high_lba);
+    qtest_add_func("/ahci/cdrom/pio/high_lba", test_cdrom_pio_high_lba);
 
     qtest_add_func("/ahci/cdrom/pio/bcl", test_atapi_bcl);
     qtest_add_func("/ahci/cdrom/eject", test_atapi_tray);
