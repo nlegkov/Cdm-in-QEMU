@@ -6,7 +6,7 @@
 #include "accel/tcg/cpu-loop.h"
 #include "system/runstate.h"
 
-void helper_halt(CPUCdM16State *env)
+void HELPER(halt)(CPUCdM16State *env)
 {
     CPUState *cs = env_cpu(env);
 
@@ -23,8 +23,7 @@ void helper_halt(CPUCdM16State *env)
     cpu_loop_exit(cs);
 }
 
-void helper_cdm16_raise_exception(CPUCdM16State *env,
-                                  uint32_t exception)
+void HELPER(cdm16_raise_exception)(CPUCdM16State *env, uint32_t exception)
 {
     CPUState *cs = env_cpu(env);
 
@@ -48,7 +47,7 @@ void HELPER(cdm16_debug_addsp)(
     );
 }
 
-void helper_cdm16_wait(CPUCdM16State *env)
+void HELPER(cdm16_wait)(CPUCdM16State *env)
 {
     CPUState *cs = env_cpu(env);
 
