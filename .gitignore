@@ -3,6 +3,7 @@
 /build-cdm16/
 /build-cdm16-new/
 /build-test/
+/roms/hexagon-firmware-build/
 /.cache/
 /.vscode/
 /.zed/
